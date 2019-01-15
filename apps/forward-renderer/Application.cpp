@@ -10,8 +10,83 @@ int Application::run()
   // ---------------------------------------------------------------------------
   // INIT
   // ---------------------------------------------------------------------------
-	// Put here code to run before rendering loop
+  glmlv::SimpleGeometry cube = glmlv::makeCube();
+  glmlv::SimpleGeometry sphere = glmlv::makeSphere(2); // Il faudra peut-être changer la valeur
+  const GLuint VERTEX_ATTR_POSITION = 0;
+  const GLuint VERTEX_ATTR_NORMAL = 1;
+  const GLuint VERTEX_ATTR_TEXCOORD = 2;
 
+  // Cube
+  // ------ VBO
+  GLuint vboCube;
+  glGenBuffers(1, &vboCube);
+  // Binding du VBO sur la cible GL_ARRAY_BUFFER:
+  glBindBuffer(GL_ARRAY_BUFFER, vboCube);
+  glBufferData(GL_ARRAY_BUFFER, cube.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), cube.vertexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  // ------ IBO
+  GLuint iboCube;
+  glGenBuffers(1, &iboCube);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboCube);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube.indexBuffer.size() * sizeof(uint32_t), cube.indexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+  // ------ VAO
+  GLuint vaoCube;
+  glGenVertexArrays(1, &vaoCube);
+  glBindVertexArray(vaoCube);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboCube);
+
+  glEnableVertexAttribArray(VERTEX_ATTR_POSITION);
+  glEnableVertexAttribArray(VERTEX_ATTR_NORMAL);
+  glEnableVertexAttribArray(VERTEX_ATTR_TEXCOORD);
+
+  glBindBuffer(GL_ARRAY_BUFFER, vboCube);
+  glVertexAttribPointer(VERTEX_ATTR_POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) 0);
+  glVertexAttribPointer(VERTEX_ATTR_NORMAL, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, normal));
+  glVertexAttribPointer(VERTEX_ATTR_TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
+
+  // Sphere
+  // ------ VBO
+  GLuint vboSphere;
+  glGenBuffers(1, &vboSphere);
+  // Binding du VBO sur la cible GL_ARRAY_BUFFER:
+  glBindBuffer(GL_ARRAY_BUFFER, vboSphere);
+  glBufferData(GL_ARRAY_BUFFER, sphere.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), sphere.vertexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  // ------ IBO
+  GLuint iboSphere;
+  glGenBuffers(1, &iboSphere);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboSphere);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphere.indexBuffer.size() * sizeof(uint32_t), sphere.indexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+  // ------ VAO
+  GLuint vaoSphere;
+  glGenVertexArrays(1, &vaoSphere);
+  glBindVertexArray(vaoSphere);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboSphere);
+
+  glEnableVertexAttribArray(VERTEX_ATTR_POSITION);
+  glEnableVertexAttribArray(VERTEX_ATTR_NORMAL);
+  glEnableVertexAttribArray(VERTEX_ATTR_TEXCOORD);
+
+  glBindBuffer(GL_ARRAY_BUFFER, vboSphere);
+  glVertexAttribPointer(VERTEX_ATTR_POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) 0);
+  glVertexAttribPointer(VERTEX_ATTR_NORMAL, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, normal));
+  glVertexAttribPointer(VERTEX_ATTR_TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
+  // Depth Test
+  glEnable(GL_DEPTH_TEST);
 
   // ---------------------------------------------------------------------------
   // LOOP
