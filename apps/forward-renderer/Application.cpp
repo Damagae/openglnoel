@@ -101,12 +101,25 @@ int Application::run()
   const auto ulMVPMatrix = program.getUniformLocation("uMVPMatrix");
   const auto ulMVMatrix = program.getUniformLocation("uMVMatrix");
   const auto ulNormalMatrix = program.getUniformLocation("uNormalMatrix");
+  // --- liées aux lights
+  const auto ulDirectionalLightDir = program.getUniformLocation("uDirectionalLightDir");
+  const auto ulDirectionalLightIntensity = program.getUniformLocation("uDirectionalLightIntensity");
+  const auto ulPointLightPosition = program.getUniformLocation("uPointLightPosition");
+  const auto ulPointLightIntensity = program.getUniformLocation("uPointLightIntensity");
+  const auto ulKd = program.getUniformLocation("uKd");
 
   program.use();
 
   // Matrices
   glm::mat4 ProjMatrix = glm::perspective(glm::radians(70.f), 1.3f, 0.01f, 100.f); // MVPM
   glm::mat4 ViewMatrix = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); // MVM
+
+  // Light
+  glm::vec3 dlDir = {1,1,1};
+  glm::vec3 dlInt = {1,1,1};
+  glm::vec3 plPos = {1,1,1};
+  glm::vec3 plInt = {1,1,1};
+  glm::vec3 kd = {1,1,1};
 
 
   // ---------------------------------------------------------------------------
@@ -134,6 +147,11 @@ int Application::run()
     glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * cubeModelMatrix));
     glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * cubeModelMatrix));
     glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * cubeModelMatrix))));
+    glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
+    glUniform3f(ulDirectionalLightIntensity, dlInt.x,	dlInt.y,	dlInt.z);
+    glUniform3f(ulPointLightPosition, plPos.x,	plPos.y,	plPos.z);
+    glUniform3f(ulPointLightIntensity, plInt.x,	plInt.y,	plInt.z);
+    glUniform3f(ulKd, kd.x,	kd.y,	kd.z);
 
     glBindVertexArray(vaoCube);
     glDrawElements(GL_TRIANGLES, cube.indexBuffer.size(), GL_UNSIGNED_INT, 0);
@@ -142,6 +160,11 @@ int Application::run()
     glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * sphereModelMatrix));
     glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * sphereModelMatrix));
     glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * sphereModelMatrix))));
+    glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
+    glUniform3f(ulDirectionalLightIntensity, dlInt.x,	dlInt.y,	dlInt.z);
+    glUniform3f(ulPointLightPosition, plPos.x,	plPos.y,	plPos.z);
+    glUniform3f(ulPointLightIntensity, plInt.x,	plInt.y,	plInt.z);
+    glUniform3f(ulKd, kd.x,	kd.y,	kd.z);
 
     glBindVertexArray(vaoSphere);
     glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, 0);
@@ -154,6 +177,11 @@ int Application::run()
         { // Fenêtre UI
             ImGui::Begin("GUI");
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::SliderFloat3("Directional Light Direction", glm::value_ptr(dlDir), 0, 1);
+            ImGui::SliderFloat3("Directional Light Intensity", glm::value_ptr(dlInt), 0, 1);
+            ImGui::SliderFloat3("Point Light Position", glm::value_ptr(plPos), 0, 1);
+            ImGui::SliderFloat3("Point Light Intensity", glm::value_ptr(plInt), 0, 1);
+            ImGui::ColorPicker3("Diffuse Color", glm::value_ptr(kd));
             ImGui::End();
         }
 
