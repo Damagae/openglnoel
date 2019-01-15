@@ -11,7 +11,7 @@ int Application::run()
   // INITIALIZATION
   // ---------------------------------------------------------------------------
   const glmlv::SimpleGeometry cube = glmlv::makeCube();
-  const glmlv::SimpleGeometry sphere = glmlv::makeSphere(2); // Il faudra peut-être changer la valeur
+  const glmlv::SimpleGeometry sphere = glmlv::makeSphere(32); // Il faudra peut-être changer la valeur
   const GLuint VERTEX_ATTR_POSITION = 0;
   const GLuint VERTEX_ATTR_NORMAL = 1;
   const GLuint VERTEX_ATTR_TEXCOORD = 2;
@@ -21,14 +21,14 @@ int Application::run()
   GLuint vboCube;
   glGenBuffers(1, &vboCube);
   glBindBuffer(GL_ARRAY_BUFFER, vboCube);
-  glBufferData(GL_ARRAY_BUFFER, cube.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), cube.vertexBuffer.data(), GL_STATIC_DRAW);
+  glBufferStorage(GL_ARRAY_BUFFER, cube.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), cube.vertexBuffer.data(), 0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   // ------ IBO
   GLuint iboCube;
   glGenBuffers(1, &iboCube);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboCube);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube.indexBuffer.size() * sizeof(uint32_t), cube.indexBuffer.data(), GL_STATIC_DRAW);
+  glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, cube.indexBuffer.size() * sizeof(uint32_t), cube.indexBuffer.data(), 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   // ------ VAO
@@ -104,13 +104,17 @@ int Application::run()
 
   program.use();
 
-  // Matrix
-  
+  // Matrices
+  glm::mat4 ProjMatrix = glm::perspective(glm::radians(70.f), 1.3f, 0.01f, 100.f); // MVPM
+  glm::mat4 ViewMatrix = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); // MVM
+
 
   // ---------------------------------------------------------------------------
   // LOOP
   // ---------------------------------------------------------------------------
   // Loop until the user closes the window
+  float clearColor[3] = { 0.5, 0.8, 0.2 };
+  glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
   for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
   {
     const auto seconds = glfwGetTime();
@@ -119,15 +123,29 @@ int Application::run()
   	const auto fbSize = m_GLFWHandle.framebufferSize();
   	glViewport(0, 0, fbSize.x, fbSize.y);
 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 cubeModelMatrix = glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0));
+    glm::mat4 sphereModelMatrix = glm::translate(glm::mat4(1), glm::vec3(2, 0, 0));
+    // glm::mat4 cubeModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+    // glm::mat4 sphereModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+
+    // --- Cube
+    glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * cubeModelMatrix));
+    glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * cubeModelMatrix));
+    glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * cubeModelMatrix))));
+
     glBindVertexArray(vaoCube);
     glDrawElements(GL_TRIANGLES, cube.indexBuffer.size(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+
+    // --- Sphere
+    glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * sphereModelMatrix));
+    glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * sphereModelMatrix));
+    glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * sphereModelMatrix))));
 
     glBindVertexArray(vaoSphere);
     glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
 
-  	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // ----------------------------------------------
 
     // GUI code -------------------------------------
