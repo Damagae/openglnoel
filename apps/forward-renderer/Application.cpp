@@ -8,10 +8,10 @@
 int Application::run()
 {
   // ---------------------------------------------------------------------------
-  // INIT
+  // INITIALIZATION
   // ---------------------------------------------------------------------------
-  glmlv::SimpleGeometry cube = glmlv::makeCube();
-  glmlv::SimpleGeometry sphere = glmlv::makeSphere(2); // Il faudra peut-être changer la valeur
+  const glmlv::SimpleGeometry cube = glmlv::makeCube();
+  const glmlv::SimpleGeometry sphere = glmlv::makeSphere(2); // Il faudra peut-être changer la valeur
   const GLuint VERTEX_ATTR_POSITION = 0;
   const GLuint VERTEX_ATTR_NORMAL = 1;
   const GLuint VERTEX_ATTR_TEXCOORD = 2;
@@ -20,7 +20,6 @@ int Application::run()
   // ------ VBO
   GLuint vboCube;
   glGenBuffers(1, &vboCube);
-  // Binding du VBO sur la cible GL_ARRAY_BUFFER:
   glBindBuffer(GL_ARRAY_BUFFER, vboCube);
   glBufferData(GL_ARRAY_BUFFER, cube.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), cube.vertexBuffer.data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -55,7 +54,6 @@ int Application::run()
   // ------ VBO
   GLuint vboSphere;
   glGenBuffers(1, &vboSphere);
-  // Binding du VBO sur la cible GL_ARRAY_BUFFER:
   glBindBuffer(GL_ARRAY_BUFFER, vboSphere);
   glBufferData(GL_ARRAY_BUFFER, sphere.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), sphere.vertexBuffer.data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -88,6 +86,27 @@ int Application::run()
   // Depth Test
   glEnable(GL_DEPTH_TEST);
 
+  // Program
+  const auto applicationPath = glmlv::fs::path{ "/home/daphne/OpenGL/IMAC3/openglnoel-build/bin/forward-renderer" };
+  const auto appName = applicationPath.stem().string();
+  const auto shadersRootPath = applicationPath.parent_path() / "shaders";
+  const auto pathToVS = shadersRootPath / appName / "forward.vs.glsl";
+  const auto pathToFS = shadersRootPath / appName / "forward.fs.glsl";
+  std::vector<std::experimental::filesystem::v1::__cxx11::path> shaders;
+  shaders.push_back(pathToVS);
+  shaders.push_back(pathToFS);
+  const glmlv::GLProgram program = glmlv::compileProgram(shaders);
+
+  // Récupérer les locations des variables uniform
+  const auto ulMVPMatrix = program.getUniformLocation("uMVPMatrix");
+  const auto ulMVMatrix = program.getUniformLocation("uMVMatrix");
+  const auto ulNormalMatrix = program.getUniformLocation("uNormalMatrix");
+
+  program.use();
+
+  // Matrix
+  
+
   // ---------------------------------------------------------------------------
   // LOOP
   // ---------------------------------------------------------------------------
@@ -99,14 +118,22 @@ int Application::run()
     // Rendering code -------------------------------
   	const auto fbSize = m_GLFWHandle.framebufferSize();
   	glViewport(0, 0, fbSize.x, fbSize.y);
-  	glClear(GL_COLOR_BUFFER_BIT);
+
+    glBindVertexArray(vaoCube);
+    glDrawElements(GL_TRIANGLES, cube.indexBuffer.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+
+    glBindVertexArray(vaoSphere);
+    glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+
+  	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // ----------------------------------------------
 
     // GUI code -------------------------------------
 		glmlv::imguiNewFrame(); // Création de la fenêtre
 
-        { // Pq il y a des accolades ?
-            // Fenêtre UI
+        { // Fenêtre UI
             ImGui::Begin("GUI");
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
@@ -129,7 +156,16 @@ int Application::run()
 		m_GLFWHandle.swapBuffers(); // Swap front and back buffers
   } // end of loop -------------------------------------------------------------
 
-    return 0;
+  // ---------------------------------------------------------------------------
+  // FREE
+  // ---------------------------------------------------------------------------
+  glDeleteBuffers(1, &vboCube);
+  glDeleteVertexArrays(1, &vaoCube);
+
+  glDeleteBuffers(1, &vboSphere);
+  glDeleteVertexArrays(1, &vaoSphere);
+
+  return 0;
 }
 
 Application::Application(int argc, char** argv):
