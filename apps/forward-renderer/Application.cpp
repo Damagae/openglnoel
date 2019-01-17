@@ -1,12 +1,16 @@
 #include "Application.hpp"
 
 #include <iostream>
+#include <unordered_set>
+#include <algorithm>
 
+#include <imgui.h>
 #include <glmlv/Image2DRGBA.hpp>
 #include <glmlv/scene_loading.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/io.hpp>
 
 int Application::run()
 {
@@ -18,6 +22,8 @@ int Application::run()
   const GLuint VERTEX_ATTR_POSITION = 0;
   const GLuint VERTEX_ATTR_NORMAL = 1;
   const GLuint VERTEX_ATTR_TEXCOORD = 2;
+
+  auto viewController = glmlv::ViewController(m_GLFWHandle.window(), 3.f);
 
   // PATH
   const auto applicationPath = glmlv::fs::path{ "/home/daphne/OpenGL/IMAC3/openglnoel-build/bin/forward-renderer" };
@@ -137,6 +143,7 @@ int Application::run()
   // TEXTURES
   glm::vec3 cubeKd = glm::vec3(1, 1, 1);
   glm::vec3 sphereKd = glm::vec3(1, 1, 1);
+  glm::vec3 sceneKd = glm::vec3(1, 1, 1);
 
   // --- cube
   glActiveTexture(GL_TEXTURE0); // We will work on GL_TEXTURE0 texture unit. Since the shader only use one texture at a time, we only need one texture unit
@@ -161,6 +168,33 @@ int Application::run()
   glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, imageSphere.width(), imageSphere.height());
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, imageSphere.width(), imageSphere.height(), GL_RGBA, GL_UNSIGNED_BYTE, imageSphere.data());
   glBindTexture(GL_TEXTURE_2D, 0);
+
+  // --- Scene
+  std::vector<GLuint> sceneTextures;
+  for (const auto & texture : scene.textures) {
+    GLuint tex = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, texture.width(), texture.height());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture.width(), texture.height(), GL_RGBA, GL_UNSIGNED_BYTE, texture.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+    sceneTextures.push_back(tex);
+  }
+
+  std::vector<glmlv::SceneData::PhongMaterial> sceneMaterials;
+  for (const auto & material : scene.materials) {
+      glmlv::SceneData::PhongMaterial newMaterial;
+      newMaterial.Ka = material.Ka;
+      newMaterial.Kd = material.Kd;
+      newMaterial.Ks = material.Ks;
+      newMaterial.shininess = material.shininess;
+      newMaterial.KaTextureId = material.KaTextureId >= 0 ? sceneTextures[material.KaTextureId] : sphereTextureKd;
+      newMaterial.KdTextureId = material.KdTextureId >= 0 ? sceneTextures[material.KdTextureId] : sphereTextureKd;
+      newMaterial.KsTextureId = material.KsTextureId >= 0 ? sceneTextures[material.KsTextureId] : sphereTextureKd;
+      newMaterial.shininessTextureId = material.shininessTextureId >= 0 ? sceneTextures[material.shininessTextureId] : sphereTextureKd;
+
+      sceneMaterials.push_back(newMaterial);
+  }
 
   // Note: no need to bind a sampler for modifying it: the sampler API is already direct_state_access
   GLuint textureSampler = 0;
@@ -228,7 +262,7 @@ int Application::run()
     // glm::mat4 sphereModelMatrix = glm::translate(glm::mat4(1), glm::vec3(2, 0, 0));
     glm::mat4 cubeModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
     glm::mat4 sphereModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
-    glm::mat4 sceneModelMatrix = glm::translate(glm::mat4(1), glm::vec3(-2, 0, 10));
+    glm::mat4 sceneModelMatrix = glm::translate(glm::mat4(1), glm::vec3(0, 0, 0));
 
     // --- Common
     glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
@@ -274,13 +308,17 @@ int Application::run()
     glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * sceneModelMatrix))));
 
     auto indexOffset = 0;
+    uint textureIndex = 0;
     for (const auto indexCount: scene.indexCountPerShape) {
 
-      glUniform3fv(ulKd, 1, glm::value_ptr(sphereKd));
-      glBindTexture(GL_TEXTURE_2D, sphereTextureKd);
+      glUniform3fv(ulKd, 1, glm::value_ptr(sceneKd));
+      auto index = scene.materialIDPerShape[indexCount];
+      if (index < sceneTextures.size())
+        glBindTexture(GL_TEXTURE_2D, sceneTextures[index]);
 
       glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
       indexOffset += indexCount;
+      ++textureIndex;
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -339,6 +377,7 @@ int Application::run()
     // Interaction code ----------------------------
     if (!guiHasFocus) {
         // Put here code to handle user interactions
+        viewController.update(float(ellapsedTime));
     }
     // ---------------------------------------------
 
