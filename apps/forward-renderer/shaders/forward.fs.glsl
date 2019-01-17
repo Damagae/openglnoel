@@ -6,6 +6,8 @@ uniform vec3 uPointLightPosition;
 uniform vec3 uPointLightIntensity;
 uniform vec3 uKd;
 
+uniform sampler2D uKdSampler;
+
 in vec3 vFragPosition;
 in vec3 vFragNormal;
 in vec2 vFragTexCoords;
@@ -17,6 +19,7 @@ void main() {
 
     float distToPointLight = length(uPointLightPosition - vFragPosition);
     vec3 dirToPointLight = (uPointLightPosition - vFragPosition) / distToPointLight;
-    fFragColor = uKd * (uDirectionalLightIntensity * max(0.0, dot(vFragNormal, uDirectionalLightDir))
+    vec4 tex = texture(uKdSampler, vFragTexCoords);
+    fFragColor = vec3(tex.r, tex.g, tex.b) * uKd * (uDirectionalLightIntensity * max(0.0, dot(vFragNormal, uDirectionalLightDir))
                 + uPointLightIntensity * max(0.0, dot(vFragNormal, dirToPointLight)) / (distToPointLight * distToPointLight));
 };

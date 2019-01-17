@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include <glmlv/Image2DRGBA.hpp>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -15,6 +17,14 @@ int Application::run()
   const GLuint VERTEX_ATTR_POSITION = 0;
   const GLuint VERTEX_ATTR_NORMAL = 1;
   const GLuint VERTEX_ATTR_TEXCOORD = 2;
+
+  // PATH
+  const auto applicationPath = glmlv::fs::path{ "/home/daphne/OpenGL/IMAC3/openglnoel-build/bin/forward-renderer" };
+  const auto appName = applicationPath.stem().string();
+  const auto shadersRootPath = applicationPath.parent_path() / "shaders";
+  const auto assetsRootPath = applicationPath.parent_path() / "assets";
+  const auto pathToVS = shadersRootPath / appName / "forward.vs.glsl";
+  const auto pathToFS = shadersRootPath / appName / "forward.fs.glsl";
 
   // Cube
   // ------ VBO
@@ -83,15 +93,46 @@ int Application::run()
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
+
+  // TEXTURES
+  glm::vec3 cubeKd = glm::vec3(1, 0, 0);
+  glm::vec3 sphereKd = glm::vec3(0, 1, 0);
+
+  // --- cube
+  glActiveTexture(GL_TEXTURE0); // We will work on GL_TEXTURE0 texture unit. Since the shader only use one texture at a time, we only need one texture unit
+
+  GLuint cubeTextureKd = 0;
+
+  glmlv::Image2DRGBA imageCube = glmlv::readImage(assetsRootPath / appName / "textures" / "cube.jpg");
+
+  glGenTextures(1, &cubeTextureKd);
+  glBindTexture(GL_TEXTURE_2D, cubeTextureKd);
+  glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, imageCube.width(), imageCube.height());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, imageCube.width(), imageCube.height(), GL_RGBA, GL_UNSIGNED_BYTE, imageCube.data());
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // --- sphere
+  GLuint sphereTextureKd = 0;
+
+  glmlv::Image2DRGBA imageSphere = glmlv::readImage(assetsRootPath / appName / "textures" / "sphere.jpg");
+
+  glGenTextures(1, &sphereTextureKd);
+  glBindTexture(GL_TEXTURE_2D, sphereTextureKd);
+  glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, imageSphere.width(), imageSphere.height());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, imageSphere.width(), imageSphere.height(), GL_RGBA, GL_UNSIGNED_BYTE, imageSphere.data());
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // Note: no need to bind a sampler for modifying it: the sampler API is already direct_state_access
+  GLuint textureSampler = 0;
+  glGenSamplers(1, &textureSampler);
+  glSamplerParameteri(textureSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glSamplerParameteri(textureSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+
   // Depth Test
   glEnable(GL_DEPTH_TEST);
 
   // Program
-  const auto applicationPath = glmlv::fs::path{ "/home/daphne/OpenGL/IMAC3/openglnoel-build/bin/forward-renderer" };
-  const auto appName = applicationPath.stem().string();
-  const auto shadersRootPath = applicationPath.parent_path() / "shaders";
-  const auto pathToVS = shadersRootPath / appName / "forward.vs.glsl";
-  const auto pathToFS = shadersRootPath / appName / "forward.fs.glsl";
   std::vector<std::experimental::filesystem::v1::__cxx11::path> shaders;
   shaders.push_back(pathToVS);
   shaders.push_back(pathToFS);
@@ -107,20 +148,26 @@ int Application::run()
   const auto ulPointLightPosition = program.getUniformLocation("uPointLightPosition");
   const auto ulPointLightIntensity = program.getUniformLocation("uPointLightIntensity");
   const auto ulKd = program.getUniformLocation("uKd");
+  // --- liées aux textures
+  const auto ulKdSampler = program.getUniformLocation("uKdSampler");
 
   program.use();
+
+  // Textures
+  glActiveTexture(GL_TEXTURE0);
+  glUniform1i(ulKdSampler, 0); // Set the uniform to 0 because we use texture unit 0
+  glBindSampler(0, textureSampler); // Tell to OpenGL what sampler we want to use on this texture unit
 
   // Matrices
   glm::mat4 ProjMatrix = glm::perspective(glm::radians(70.f), 1.3f, 0.01f, 100.f); // MVPM
   glm::mat4 ViewMatrix = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); // MVM
 
   // Light
-  glm::vec3 dlDir = {1,1,1};
-  glm::vec3 dlInt = {1,1,1};
-  glm::vec3 plPos = {1,1,1};
-  glm::vec3 plInt = {1,1,1};
+  glm::vec3 dlDir = {1.0f, 1.0f, 1.0f};
+  glm::vec3 dlInt = {1.0f, 1.0f, 1.0f};
+  glm::vec3 plPos = {0.5f, 0.5f, 0.5f};
+  glm::vec3 plInt = {0.5f, 0.5f, 0.5f};
   glm::vec3 kd = {1,1,1};
-
 
   // ---------------------------------------------------------------------------
   // LOOP
@@ -138,20 +185,29 @@ int Application::run()
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::mat4 cubeModelMatrix = glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0));
-    glm::mat4 sphereModelMatrix = glm::translate(glm::mat4(1), glm::vec3(2, 0, 0));
-    // glm::mat4 cubeModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
-    // glm::mat4 sphereModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+    // glm::mat4 cubeModelMatrix = glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0));
+    // glm::mat4 sphereModelMatrix = glm::translate(glm::mat4(1), glm::vec3(2, 0, 0));
+    glm::mat4 cubeModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+    glm::mat4 sphereModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
 
-    // --- Cube
-    glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * cubeModelMatrix));
-    glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * cubeModelMatrix));
-    glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * cubeModelMatrix))));
+    // --- Common
     glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
     glUniform3f(ulDirectionalLightIntensity, dlInt.x,	dlInt.y,	dlInt.z);
     glUniform3f(ulPointLightPosition, plPos.x,	plPos.y,	plPos.z);
     glUniform3f(ulPointLightIntensity, plInt.x,	plInt.y,	plInt.z);
     glUniform3f(ulKd, kd.x,	kd.y,	kd.z);
+
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(ulKdSampler, 0); // Set the uniform to 0 because we use texture unit 0
+    glBindSampler(0, textureSampler); // Tell to OpenGL what sampler we want to use on this texture unit
+
+    // --- Cube
+    glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * cubeModelMatrix));
+    glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * cubeModelMatrix));
+    glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * cubeModelMatrix))));
+
+    glUniform3fv(ulKd, 1, glm::value_ptr(cubeKd));
+    glBindTexture(GL_TEXTURE_2D, cubeTextureKd);
 
     glBindVertexArray(vaoCube);
     glDrawElements(GL_TRIANGLES, cube.indexBuffer.size(), GL_UNSIGNED_INT, 0);
@@ -160,14 +216,15 @@ int Application::run()
     glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * sphereModelMatrix));
     glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(ProjMatrix * ViewMatrix * sphereModelMatrix));
     glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * sphereModelMatrix))));
-    glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
-    glUniform3f(ulDirectionalLightIntensity, dlInt.x,	dlInt.y,	dlInt.z);
-    glUniform3f(ulPointLightPosition, plPos.x,	plPos.y,	plPos.z);
-    glUniform3f(ulPointLightIntensity, plInt.x,	plInt.y,	plInt.z);
-    glUniform3f(ulKd, kd.x,	kd.y,	kd.z);
+
+    glUniform3fv(ulKd, 1, glm::value_ptr(sphereKd));
+    glBindTexture(GL_TEXTURE_2D, sphereTextureKd);
 
     glBindVertexArray(vaoSphere);
     glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, 0);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindSampler(0, 0); // Unbind the sampler
 
     // ----------------------------------------------
 
@@ -182,6 +239,12 @@ int Application::run()
             ImGui::SliderFloat3("Point Light Position", glm::value_ptr(plPos), 0, 1);
             ImGui::SliderFloat3("Point Light Intensity", glm::value_ptr(plInt), 0, 1);
             ImGui::ColorPicker3("Diffuse Color", glm::value_ptr(kd));
+
+            if (ImGui::CollapsingHeader("Materials")) {
+                ImGui::ColorEdit3("Cube Kd", glm::value_ptr(cubeKd));
+                ImGui::ColorEdit3("Sphere Kd", glm::value_ptr(sphereKd));
+            }
+
             ImGui::End();
         }
 
@@ -223,5 +286,5 @@ Application::Application(int argc, char** argv):
 {
     ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
-    // Put here initialization code
+    // Put here initialization code - ou pas hé hé
 }
