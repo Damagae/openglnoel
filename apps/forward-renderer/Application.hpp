@@ -8,7 +8,7 @@
 
 class Application
 {
-public:
+public: 
     Application(int argc, char** argv);
 
     int run();

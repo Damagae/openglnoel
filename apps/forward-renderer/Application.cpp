@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <glmlv/Image2DRGBA.hpp>
+#include <glmlv/scene_loading.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -93,10 +94,49 @@ int Application::run()
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
+  // Scene
+  glmlv::SceneData scene;
+  glmlv::loadObjScene(assetsRootPath / appName / "models" / "sponza.obj", scene);
+  const auto sceneDiagonalSize = glm::length(scene.bboxMax - scene.bboxMin);
+  // GLuint viewController;
+  // viewController.setSpeed(sceneDiagonalSize * 0.1f); // 10% de la scene parcouru par seconde
+
+  // ------ VBO
+  GLuint vboScene;
+  glGenBuffers(1, &vboScene);
+  glBindBuffer(GL_ARRAY_BUFFER, vboScene);
+  glBufferData(GL_ARRAY_BUFFER, scene.vertexBuffer.size() * sizeof(glmlv::Vertex3f3f2f), scene.vertexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  // ------ IBO
+  GLuint iboScene;
+  glGenBuffers(1, &iboScene);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboScene);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, scene.indexBuffer.size() * sizeof(uint32_t), scene.indexBuffer.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+  // ------ VAO
+  GLuint vaoScene;
+  glGenVertexArrays(1, &vaoScene);
+  glBindVertexArray(vaoScene);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboScene);
+
+  glEnableVertexAttribArray(VERTEX_ATTR_POSITION);
+  glEnableVertexAttribArray(VERTEX_ATTR_NORMAL);
+  glEnableVertexAttribArray(VERTEX_ATTR_TEXCOORD);
+
+  glBindBuffer(GL_ARRAY_BUFFER, vboScene);
+  glVertexAttribPointer(VERTEX_ATTR_POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) 0);
+  glVertexAttribPointer(VERTEX_ATTR_NORMAL, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, normal));
+  glVertexAttribPointer(VERTEX_ATTR_TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
 
   // TEXTURES
-  glm::vec3 cubeKd = glm::vec3(1, 0, 0);
-  glm::vec3 sphereKd = glm::vec3(0, 1, 0);
+  glm::vec3 cubeKd = glm::vec3(1, 1, 1);
+  glm::vec3 sphereKd = glm::vec3(1, 1, 1);
 
   // --- cube
   glActiveTexture(GL_TEXTURE0); // We will work on GL_TEXTURE0 texture unit. Since the shader only use one texture at a time, we only need one texture unit
@@ -127,7 +167,6 @@ int Application::run()
   glGenSamplers(1, &textureSampler);
   glSamplerParameteri(textureSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glSamplerParameteri(textureSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 
   // Depth Test
   glEnable(GL_DEPTH_TEST);
@@ -189,6 +228,7 @@ int Application::run()
     // glm::mat4 sphereModelMatrix = glm::translate(glm::mat4(1), glm::vec3(2, 0, 0));
     glm::mat4 cubeModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
     glm::mat4 sphereModelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+    glm::mat4 sceneModelMatrix = glm::translate(glm::mat4(1), glm::vec3(-2, 0, 10));
 
     // --- Common
     glUniform3f(ulDirectionalLightDir, dlDir.x,	dlDir.y,	dlDir.z);
@@ -223,8 +263,48 @@ int Application::run()
     glBindVertexArray(vaoSphere);
     glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, 0);
 
+    // Objects
+    glBindVertexArray(vaoScene);
+
+    const auto sceneSize = glm::length(scene.bboxMax - scene.bboxMin);
+    const auto sceneProjMatrix = glm::perspective(70.f, float(fbSize.x) / fbSize.y, 0.01f * sceneSize, sceneSize); // near = 1% de la taille de la scene, far = 100
+
+    glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * sceneModelMatrix));
+    glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(sceneProjMatrix * ViewMatrix * sceneModelMatrix));
+    glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * sceneModelMatrix))));
+
+    auto indexOffset = 0;
+    for (const auto indexCount: scene.indexCountPerShape) {
+
+      glUniform3fv(ulKd, 1, glm::value_ptr(sphereKd));
+      glBindTexture(GL_TEXTURE_2D, sphereTextureKd);
+
+      glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
+      indexOffset += indexCount;
+    }
+
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindSampler(0, 0); // Unbind the sampler
+
+    // Objects
+    // glBindVertexArray(vaoScene);
+    //
+    // auto indexOffset = 0;
+    // for (const auto indexCount: scene.indexCountPerShape) {
+    //
+    //   glUniformMatrix4fv(ulMVMatrix, 1, GL_FALSE, glm::value_ptr(ViewMatrix * scene.localToWorldMatrixPerShape[indexCount] * sceneModelMatrix));
+    //   glUniformMatrix4fv(ulMVPMatrix, 1, GL_FALSE, glm::value_ptr(sceneProjMatrix * ViewMatrix * scene.localToWorldMatrixPerShape[indexCount] * sceneModelMatrix));
+    //   glUniformMatrix4fv(ulNormalMatrix, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ViewMatrix * scene.localToWorldMatrixPerShape[indexCount] * sceneModelMatrix))));
+    //
+    //   glUniform3fv(ulKd, 1, glm::value_ptr(sphereKd));
+    //   glBindTexture(GL_TEXTURE_2D, scene.materialIDPerShape[indexCount]);
+    //
+    //   glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
+    //   indexOffset += indexCount;
+    // }
+    //
+    // glBindTexture(GL_TEXTURE_2D, 0);
+    // glBindSampler(0, 0); // Unbind the sampler
 
     // ----------------------------------------------
 
