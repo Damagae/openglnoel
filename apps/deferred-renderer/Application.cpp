@@ -28,8 +28,6 @@ int Application::run()
   // PATH
   const auto shadersRootPath = m_AppPath.parent_path() / "shaders";
   const auto assetsRootPath = m_AppPath.parent_path() / "assets";
-  const auto pathToVS = shadersRootPath / m_AppName / "geometryPass.vs.glsl";
-  const auto pathToFS = shadersRootPath / m_AppName / "geometryPass.fs.glsl";
 
   // Scene
   glmlv::SceneData scene;
@@ -130,6 +128,22 @@ int Application::run()
   }
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
+  GLuint vboTriangle;
+  glGenBuffers(1, &vboTriangle);
+  glBindBuffer(GL_ARRAY_BUFFER, vboTriangle);
+
+  GLfloat data[] = { -1, -1, 3, -1, -1, 3 };
+  glBufferStorage(GL_ARRAY_BUFFER, sizeof(data), data, 0);
+
+  GLuint vaoTriangle;
+  glGenVertexArrays(1, &vaoTriangle);
+  glBindVertexArray(vaoTriangle);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
   // --- White Texture
   GLuint whiteTex;
   glGenTextures(1, &whiteTex);
@@ -189,32 +203,46 @@ int Application::run()
   glEnable(GL_MULTISAMPLE);
 
   // PROGRAM
-  std::vector<std::experimental::filesystem::v1::__cxx11::path> shaders;
-  shaders.push_back(pathToVS);
-  shaders.push_back(pathToFS);
-  const glmlv::GLProgram program = glmlv::compileProgram(shaders);
-  program.use();
+  const auto pathToVSGeometry = shadersRootPath / m_AppName / "geometryPass.vs.glsl";
+  const auto pathToFSGeometry = shadersRootPath / m_AppName / "geometryPass.fs.glsl";
+  std::vector<std::experimental::filesystem::v1::__cxx11::path> shadersGeometry;
+  shadersGeometry.push_back(pathToVSGeometry);
+  shadersGeometry.push_back(pathToFSGeometry);
+  const glmlv::GLProgram programGeometry = glmlv::compileProgram(shadersGeometry);
+
+  const auto pathToVSShading = shadersRootPath / m_AppName / "shadingPass.vs.glsl";
+  const auto pathToFSShading = shadersRootPath / m_AppName / "shadingPass.fs.glsl";
+  std::vector<std::experimental::filesystem::v1::__cxx11::path> shadersShading;
+  shadersShading.push_back(pathToVSShading);
+  shadersShading.push_back(pathToFSShading);
+  const glmlv::GLProgram programShading = glmlv::compileProgram(shadersShading);
 
   // VARIABLES UNIFORM
   // Récupérer les locations des variables uniform
-  const auto ulMVPMatrix = program.getUniformLocation("uMVPMatrix");
-  const auto ulMVMatrix = program.getUniformLocation("uMVMatrix");
-  const auto ulNormalMatrix = program.getUniformLocation("uNormalMatrix");
+  const auto ulMVPMatrix = programGeometry.getUniformLocation("uMVPMatrix");
+  const auto ulMVMatrix = programGeometry.getUniformLocation("uMVMatrix");
+  const auto ulNormalMatrix = programGeometry.getUniformLocation("uNormalMatrix");
   // --- liées aux lights
-  const auto ulDirectionalLightDir = program.getUniformLocation("uDirectionalLightDir");
-  const auto ulDirectionalLightIntensity = program.getUniformLocation("uDirectionalLightIntensity");
-  const auto ulPointLightPosition = program.getUniformLocation("uPointLightPosition");
-  const auto ulPointLightIntensity = program.getUniformLocation("uPointLightIntensity");
+  const auto ulDirectionalLightDir = programShading.getUniformLocation("uDirectionalLightDir");
+  const auto ulDirectionalLightIntensity = programShading.getUniformLocation("uDirectionalLightIntensity");
+  const auto ulPointLightPosition = programShading.getUniformLocation("uPointLightPosition");
+  const auto ulPointLightIntensity = programShading.getUniformLocation("uPointLightIntensity");
   // --- liées aux textures et matériaux
-  const auto ulKa = program.getUniformLocation("uKa");
-  const auto ulKd = program.getUniformLocation("uKd");
-  const auto ulKs = program.getUniformLocation("uKs");
-  const auto ulShininess = program.getUniformLocation("uShininess");
-
-  const auto ulKaSampler = program.getUniformLocation("uKaSampler");
-  const auto ulKdSampler = program.getUniformLocation("uKdSampler");
-  const auto ulKsSampler = program.getUniformLocation("uKsSampler");
-  const auto ulShininessSampler = program.getUniformLocation("uShininessSampler");
+  const auto ulKa = programGeometry.getUniformLocation("uKa");
+  const auto ulKd = programGeometry.getUniformLocation("uKd");
+  const auto ulKs = programGeometry.getUniformLocation("uKs");
+  const auto ulShininess = programGeometry.getUniformLocation("uShininess");
+  const auto ulKaSampler = programGeometry.getUniformLocation("uKaSampler");
+  const auto ulKdSampler = programGeometry.getUniformLocation("uKdSampler");
+  const auto ulKsSampler = programGeometry.getUniformLocation("uKsSampler");
+  const auto ulShininessSampler = programGeometry.getUniformLocation("uShininessSampler");
+  // --- Gemoetry Buffer Samplers
+  GLint ulGBufferSamplers[GDepth];
+  ulGBufferSamplers[GPosition] = programShading.getUniformLocation("uGPosition");
+  ulGBufferSamplers[GNormal] = programShading.getUniformLocation("uGNormal");
+  ulGBufferSamplers[GAmbient] = programShading.getUniformLocation("uGAmbient");
+  ulGBufferSamplers[GDiffuse] = programShading.getUniformLocation("uGDiffuse");
+  ulGBufferSamplers[GGlossyShininess] = programShading.getUniformLocation("uGGlossyShininess");
 
   // LIGHTS
   float dirLightPhiAngleDegrees = 90.f;
@@ -227,7 +255,7 @@ int Application::run()
   glm::vec3 pointLightColor = glm::vec3(1, 1, 1);
   float pointLightIntensity = 5.f;
 
-  GBufferTextureType currentlyDisplayed = GDiffuse;
+  GBufferTextureType currentlyDisplayed = GBufferTextureCount;
 
   // ---------------------------------------------------------------------------
   // LOOP
@@ -242,6 +270,8 @@ int Application::run()
 
     // Rendering code -------------------------------
   	const auto fbSize = m_GLFWHandle.framebufferSize();
+
+    programGeometry.use();
 
     // Bind FBO
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
@@ -330,10 +360,67 @@ int Application::run()
     glViewport(0, 0, viewportSize.x, viewportSize.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-    glReadBuffer(GL_COLOR_ATTACHMENT0 + currentlyDisplayed);
-    glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    if (currentlyDisplayed == GBufferTextureCount)
+        {
+            // Shading pass
+            {
+              programShading.use();
+
+              glUniform3fv(ulDirectionalLightDir, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(dirLightDirection), 0))));
+              glUniform3fv(ulDirectionalLightIntensity, 1, glm::value_ptr(dirLightColor * dirLightIntensity));
+
+              glUniform3fv(ulPointLightPosition, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(pointLightPosition, 1))));
+              glUniform3fv(ulPointLightIntensity, 1, glm::value_ptr(pointLightColor * pointLightIntensity));
+
+              for (int32_t i = GPosition; i < GDepth; ++i) {
+                  glActiveTexture(GL_TEXTURE0 + i);
+                  glBindTexture(GL_TEXTURE_2D, gBufferTextures[i]);
+
+                  glUniform1i(ulGBufferSamplers[i], i);
+            }
+
+            glBindVertexArray(vaoTriangle);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
+
+    } /* else if (currentlyDisplayed == GDepth) {
+      programDepth.use();
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDepth]);
+
+      glUniform1i(ulGDepthSampler, 0);
+
+      glBindVertexArray(vaoTriangle);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+
+    }*/ /* else if (currentlyDisplayed == GPosition) {
+      programPosition.use();
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gBufferTextures[GPosition]);
+
+      glUniform1i(ulGDepthSamplerLocation, 0);
+
+      const auto rcpProjMat = glm::inverse(projMatrix);
+
+      const glm::vec4 frustrumTopRight(1, 1, 1, 1);
+      const auto frustrumTopRight_view = rcpProjMat * frustrumTopRight;
+
+      glUniform3fv(m_uSceneSizeLocation, 1, glm::value_ptr(frustrumTopRight_view / frustrumTopRight_view.w));
+
+      glBindVertexArray(vaoTriangle);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+
+    }*/ else {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+      glReadBuffer(GL_COLOR_ATTACHMENT0 + currentlyDisplayed);
+      glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    }
 
 		glmlv::imguiNewFrame(); // Création de la fenêtre
 

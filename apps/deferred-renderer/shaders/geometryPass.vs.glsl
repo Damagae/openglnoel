@@ -16,7 +16,7 @@ out vec3 vFragNormal; // Normale du sommet transformé dans l'espace View
 out vec2 vFragTexCoords; // Coordonnées de texture du sommet
 
 void main() {
-   // Passage en coordonnées homogènes
+    // Passage en coordonnées homogènes
     vec4 vertexPosition = vec4(aVertexPosition, 1);
     vec4 vertexNormal = vec4(aVertexNormal, 0);
 
