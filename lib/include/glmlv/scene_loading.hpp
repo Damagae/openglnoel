@@ -32,13 +32,13 @@ namespace glmlv
         std::vector<Vertex3f3f2f> vertexBuffer; // Tableau de sommets
         std::vector<uint32_t> indexBuffer; // Tableau d'index de sommets
 
-		size_t shapeCount = 0; // Nombre d'objets à dessiner
+		    size_t shapeCount = 0; // Nombre d'objets ï¿½ dessiner
         std::vector<uint32_t> indexCountPerShape; // Nomber d'index de sommets pour chaque objet
-		std::vector<glm::mat4> localToWorldMatrixPerShape; // Matrice localToWorld de chaque objet
+		    std::vector<glm::mat4> localToWorldMatrixPerShape; // Matrice localToWorld de chaque objet
         std::vector<int32_t> materialIDPerShape; // Index du materiau de chaque objet (-1 si pas de materiaux)
 
         std::vector<PhongMaterial> materials; // Tableau des materiaux
-        std::vector<Image2DRGBA> textures; // Tableau des textures référencés par les materiaux
+        std::vector<Image2DRGBA> textures; // Tableau des textures rï¿½fï¿½rencï¿½s par les materiaux
     };
 
 #ifdef GLMLV_USE_ASSIMP

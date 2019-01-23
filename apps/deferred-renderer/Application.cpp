@@ -26,16 +26,14 @@ int Application::run()
   auto viewController = glmlv::ViewController(m_GLFWHandle.window(), 3.f);
 
   // PATH
-  const auto applicationPath = glmlv::fs::path{ "/home/daphne/OpenGL/IMAC3/openglnoel-build/bin/forward-renderer" };
-  const auto appName = applicationPath.stem().string();
-  const auto shadersRootPath = applicationPath.parent_path() / "shaders";
-  const auto assetsRootPath = applicationPath.parent_path() / "assets";
-  const auto pathToVS = shadersRootPath / appName / "forward.vs.glsl";
-  const auto pathToFS = shadersRootPath / appName / "forward.fs.glsl";
+  const auto shadersRootPath = m_AppPath.parent_path() / "shaders";
+  const auto assetsRootPath = m_AppPath.parent_path() / "assets";
+  const auto pathToVS = shadersRootPath / m_AppName / "geometryPass.vs.glsl";
+  const auto pathToFS = shadersRootPath / m_AppName / "geometryPass.fs.glsl";
 
   // Scene
   glmlv::SceneData scene;
-  glmlv::loadObjScene(assetsRootPath / appName / "models" / "sponza.obj", scene);
+  glmlv::loadObjScene(assetsRootPath / m_AppName / "models" / "sponza.obj", scene);
   const auto sceneSize = glm::length(scene.bboxMax - scene.bboxMin);
   viewController.setSpeed(sceneSize * 0.1f); // 10% de la scene parcouru par seconde
 
@@ -70,6 +68,7 @@ int Application::run()
     shape.materialID = scene.materialIDPerShape[shapeID];
     shape.localToWorldMatrix = scene.localToWorldMatrixPerShape[shapeID];
     indexOffset += shape.indexCount;
+    ++scene.shapeCount;
   }
 
   // ------ VAO
@@ -94,6 +93,43 @@ int Application::run()
   glBindVertexArray(0);
 
   // TEXTURES
+  // --- Buffer Textures
+  enum GBufferTextureType {
+      GPosition = 0,
+      GNormal,
+      GAmbient,
+      GDiffuse,
+      GGlossyShininess,
+      GDepth, // On doit créer une texture de depth mais on écrit pas directement dedans dans le FS. OpenGL le fait pour nous (et l'utilise).
+      GBufferTextureCount // = 6
+  };
+  GLuint gBufferTextures[GBufferTextureCount];
+  const GLenum gBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+  glGenTextures(GBufferTextureCount, gBufferTextures);
+  for (auto i = 0; i < GBufferTextureCount; ++i) {
+    glBindTexture(GL_TEXTURE_2D, gBufferTextures[i]);
+    glTexStorage2D(GL_TEXTURE_2D, 1, gBufferTextureFormat[i], m_nWindowWidth, m_nWindowHeight);
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
+  // --- Frame Buffer Object
+  GLuint fbo;
+  const GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)fbo);
+  for (auto i = 0; i < GBufferTextureCount - 1; ++i) {
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, gBufferTextures[i], 0);
+  }
+  glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gBufferTextures[5], 0); // GDepth
+  glDrawBuffers(5, drawBuffers);
+  const auto status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    std::cerr << "FrameBuffer failed" << std::endl;
+  } else {
+    std::cout << "FrameBuffer OK" << std::endl;
+  }
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
   // --- White Texture
   GLuint whiteTex;
   glGenTextures(1, &whiteTex);
@@ -191,6 +227,8 @@ int Application::run()
   glm::vec3 pointLightColor = glm::vec3(1, 1, 1);
   float pointLightIntensity = 5.f;
 
+  GBufferTextureType currentlyDisplayed = GDiffuse;
+
   // ---------------------------------------------------------------------------
   // LOOP
   // ---------------------------------------------------------------------------
@@ -204,8 +242,11 @@ int Application::run()
 
     // Rendering code -------------------------------
   	const auto fbSize = m_GLFWHandle.framebufferSize();
-  	glViewport(0, 0, fbSize.x, fbSize.y);
 
+    // Bind FBO
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+
+  	glViewport(0, 0, fbSize.x, fbSize.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Matrices
@@ -280,9 +321,20 @@ int Application::run()
       glBindSampler(i, 0);
     }
 
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Unbind FBO
+
     // ----------------------------------------------
 
     // GUI code -------------------------------------
+    const auto viewportSize = m_GLFWHandle.framebufferSize();
+    glViewport(0, 0, viewportSize.x, viewportSize.y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+    glReadBuffer(GL_COLOR_ATTACHMENT0 + currentlyDisplayed);
+    glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
 		glmlv::imguiNewFrame(); // Création de la fenêtre
 
         { // Fenêtre UI
@@ -310,6 +362,16 @@ int Application::run()
                 ImGui::ColorEdit3("PointLightColor", glm::value_ptr(pointLightColor));
                 ImGui::DragFloat("PointLightIntensity", &pointLightIntensity, 0.1f, 0.f, 16000.f);
                 ImGui::InputFloat3("Position", glm::value_ptr(pointLightPosition));
+            }
+
+            if (ImGui::CollapsingHeader("GBuffer")) {
+                for (int32_t i = GPosition; i < GDepth; ++i)
+                {
+                    const char* gBufferTexNames[GBufferTextureCount] = {"Position", "Normal", "Ambient", "Diffuse", "GlossyShininess", "Depth"};
+                    if (ImGui::RadioButton(gBufferTexNames[i], currentlyDisplayed == i)) {
+                      currentlyDisplayed = GBufferTextureType(i);
+                    }
+                }
             }
 
             ImGui::End();
