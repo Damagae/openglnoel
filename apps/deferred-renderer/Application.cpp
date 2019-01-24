@@ -17,8 +17,6 @@ int Application::run()
   // ---------------------------------------------------------------------------
   // INITIALIZATION
   // ---------------------------------------------------------------------------
-  const glmlv::SimpleGeometry cube = glmlv::makeCube();
-  const glmlv::SimpleGeometry sphere = glmlv::makeSphere(32); // Il faudra peut-être changer la valeur
   const GLuint VERTEX_ATTR_POSITION = 0;
   const GLuint VERTEX_ATTR_NORMAL = 1;
   const GLuint VERTEX_ATTR_TEXCOORD = 2;
@@ -94,12 +92,12 @@ int Application::run()
   // --- Buffer Textures
   enum GBufferTextureType {
       GPosition = 0,
-      GNormal,
-      GAmbient,
-      GDiffuse,
-      GGlossyShininess,
-      GDepth, // On doit créer une texture de depth mais on écrit pas directement dedans dans le FS. OpenGL le fait pour nous (et l'utilise).
-      GBufferTextureCount // = 6
+      GNormal, // 1
+      GAmbient, // 2
+      GDiffuse, // 3
+      GGlossyShininess, // 4
+      GDepth, // 5 // On doit créer une texture de depth mais on écrit pas directement dedans dans le FS. OpenGL le fait pour nous (et l'utilise).
+      GBufferTextureCount // 6
   };
   GLuint gBufferTextures[GBufferTextureCount];
   const GLenum gBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
@@ -122,36 +120,38 @@ int Application::run()
   glDrawBuffers(5, drawBuffers);
   const auto status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
   if (status != GL_FRAMEBUFFER_COMPLETE) {
-    std::cerr << "FrameBuffer failed" << std::endl;
+    std::cerr << "FrameBuffer failed - status : " << status << std::endl;
   } else {
     std::cout << "FrameBuffer OK" << std::endl;
   }
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-  GLuint vboTriangle;
-  glGenBuffers(1, &vboTriangle);
-  glBindBuffer(GL_ARRAY_BUFFER, vboTriangle);
+  // TRIANGLE -----------------------------------------------------------------
+    GLuint vboTriangle;
+    glGenBuffers(1, &vboTriangle);
+    glBindBuffer(GL_ARRAY_BUFFER, vboTriangle);
 
-  GLfloat data[] = { -1, -1, 3, -1, -1, 3 };
-  glBufferStorage(GL_ARRAY_BUFFER, sizeof(data), data, 0);
+    GLfloat dataTriangle[] = { -1, -1, 3, -1, -1, 3 };
+    glBufferStorage(GL_ARRAY_BUFFER, sizeof(dataTriangle), dataTriangle, 0);
 
-  GLuint vaoTriangle;
-  glGenVertexArrays(1, &vaoTriangle);
-  glBindVertexArray(vaoTriangle);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    GLuint vaoTriangle;
+    glGenVertexArrays(1, &vaoTriangle);
+    glBindVertexArray(vaoTriangle);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
+  // TEXTURES ------------------------------------------------------------------
   // --- White Texture
-  GLuint whiteTex;
-  glGenTextures(1, &whiteTex);
-  glBindTexture(GL_TEXTURE_2D, whiteTex);
-  glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, 1, 1);
-  glm::vec4 white(1.f, 1.f, 1.f, 1.f);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1, 1, GL_RGBA, GL_FLOAT, &white);
-  glBindTexture(GL_TEXTURE_2D, 0);
+    GLuint whiteTex;
+    glGenTextures(1, &whiteTex);
+    glBindTexture(GL_TEXTURE_2D, whiteTex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, 1, 1);
+    glm::vec4 white(1.f, 1.f, 1.f, 1.f);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1, 1, GL_RGBA, GL_FLOAT, &white);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
   // --- Scene textures
   std::vector<GLuint> sceneTextures;
@@ -181,6 +181,7 @@ int Application::run()
       sceneMaterials.emplace_back(newMaterial);
   }
 
+  // --- Default Material
   glmlv::SceneData::PhongMaterial defaultMat;
   defaultMat.Ka = glm::vec3(0);
   defaultMat.Kd = glm::vec3(1);
@@ -198,11 +199,11 @@ int Application::run()
   glSamplerParameteri(textureSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glSamplerParameteri(textureSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  // DEPTH TEST
+  // DEPTH TEST & MULTISAMPLE --------------------------------------------------
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  // PROGRAM
+  // PROGRAM -------------------------------------------------------------------
   const auto pathToVSGeometry = shadersRootPath / m_AppName / "geometryPass.vs.glsl";
   const auto pathToFSGeometry = shadersRootPath / m_AppName / "geometryPass.fs.glsl";
   std::vector<std::experimental::filesystem::v1::__cxx11::path> shadersGeometry;
@@ -217,7 +218,7 @@ int Application::run()
   shadersShading.push_back(pathToFSShading);
   const glmlv::GLProgram programShading = glmlv::compileProgram(shadersShading);
 
-  // VARIABLES UNIFORM
+  // VARIABLES UNIFORMES -------------------------------------------------------
   // Récupérer les locations des variables uniform
   const auto ulMVPMatrix = programGeometry.getUniformLocation("uMVPMatrix");
   const auto ulMVMatrix = programGeometry.getUniformLocation("uMVMatrix");
@@ -244,7 +245,7 @@ int Application::run()
   ulGBufferSamplers[GDiffuse] = programShading.getUniformLocation("uGDiffuse");
   ulGBufferSamplers[GGlossyShininess] = programShading.getUniformLocation("uGGlossyShininess");
 
-  // LIGHTS
+  // LIGHTS --------------------------------------------------------------------
   float dirLightPhiAngleDegrees = 90.f;
   float dirLightThetaAngleDegrees = 45.f;
   glm::vec3 dirLightDirection = computeDirectionVector(glm::radians(dirLightPhiAngleDegrees), glm::radians(dirLightThetaAngleDegrees));
@@ -255,13 +256,15 @@ int Application::run()
   glm::vec3 pointLightColor = glm::vec3(1, 1, 1);
   float pointLightIntensity = 5.f;
 
+  // DISPLAY MODE --------------------------------------------------------------
+  // GBufferTextureType currentlyDisplayed = GDiffuse;
   GBufferTextureType currentlyDisplayed = GBufferTextureCount;
 
   // ---------------------------------------------------------------------------
   // LOOP
   // ---------------------------------------------------------------------------
   // Loop until the user closes the window
-  float clearColor[3] = { 0.5, 0.8, 0.2 };
+  float clearColor[3] = { 0, 0.7, 0.7 };
   glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
 
   for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
@@ -274,22 +277,14 @@ int Application::run()
     programGeometry.use();
 
     // Bind FBO
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo); // PAS TOUCHER
 
   	glViewport(0, 0, fbSize.x, fbSize.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Matrices
+    // Matrices View et Projection
     const auto sceneProjMatrix = glm::perspective(70.f, float(fbSize.x) / fbSize.y, 0.01f * sceneSize, sceneSize); // near = 1% de la taille de la scene, far = 100
     const auto viewMatrix = viewController.getViewMatrix();
-
-    // Directional Light
-    glUniform3fv(ulDirectionalLightDir, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(dirLightDirection), 0))));
-    glUniform3fv(ulDirectionalLightIntensity, 1, glm::value_ptr(dirLightColor * dirLightIntensity));
-
-    // Point light
-    glUniform3fv(ulPointLightPosition, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(pointLightPosition, 1))));
-    glUniform3fv(ulPointLightIntensity, 1, glm::value_ptr(pointLightColor * pointLightIntensity));
 
     // Samplers
     for (GLuint i : {0, 1, 2, 3}) {
@@ -308,7 +303,7 @@ int Application::run()
     // Materials
     const glmlv::SceneData::PhongMaterial * currentMaterial = nullptr;
 
-    // Drawing
+    // Drawing -----------------------------------------------------------------
     // For each shape
     for (const auto shape: shapes) {
       // Récupération du material
@@ -320,7 +315,6 @@ int Application::run()
         glUniform3fv(ulKd, 1, glm::value_ptr(material.Kd));
         glUniform3fv(ulKs, 1, glm::value_ptr(material.Ks));
         glUniform1fv(ulShininess, 1, &material.shininess);
-
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, material.KaTextureId);
         glActiveTexture(GL_TEXTURE1);
@@ -332,7 +326,7 @@ int Application::run()
         currentMaterial = &material;
       }
 
-      // Matrices
+      // Matrices locales
       const auto modelMatrix = shape.localToWorldMatrix;
 
 			const auto mvMatrix = viewMatrix * modelMatrix;
@@ -351,6 +345,9 @@ int Application::run()
       glBindSampler(i, 0);
     }
 
+    // Unbind VAO
+    glBindVertexArray(0);
+
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Unbind FBO
 
     // ----------------------------------------------
@@ -366,61 +363,31 @@ int Application::run()
             {
               programShading.use();
 
+              // Uniform des lights
               glUniform3fv(ulDirectionalLightDir, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(dirLightDirection), 0))));
               glUniform3fv(ulDirectionalLightIntensity, 1, glm::value_ptr(dirLightColor * dirLightIntensity));
 
               glUniform3fv(ulPointLightPosition, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(pointLightPosition, 1))));
               glUniform3fv(ulPointLightIntensity, 1, glm::value_ptr(pointLightColor * pointLightIntensity));
 
-              for (int32_t i = GPosition; i < GDepth; ++i) {
+              for (int32_t i = GPosition; i < GDepth; ++i) { // 0 à 4
                   glActiveTexture(GL_TEXTURE0 + i);
                   glBindTexture(GL_TEXTURE_2D, gBufferTextures[i]);
-
                   glUniform1i(ulGBufferSamplers[i], i);
             }
 
+            // Draw triangle
             glBindVertexArray(vaoTriangle);
             glDrawArrays(GL_TRIANGLES, 0, 3);
             glBindVertexArray(0);
         }
 
-    } /* else if (currentlyDisplayed == GDepth) {
-      programDepth.use();
-
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDepth]);
-
-      glUniform1i(ulGDepthSampler, 0);
-
-      glBindVertexArray(vaoTriangle);
-      glDrawArrays(GL_TRIANGLES, 0, 3);
-      glBindVertexArray(0);
-
-    }*/ /* else if (currentlyDisplayed == GPosition) {
-      programPosition.use();
-
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, gBufferTextures[GPosition]);
-
-      glUniform1i(ulGDepthSamplerLocation, 0);
-
-      const auto rcpProjMat = glm::inverse(projMatrix);
-
-      const glm::vec4 frustrumTopRight(1, 1, 1, 1);
-      const auto frustrumTopRight_view = rcpProjMat * frustrumTopRight;
-
-      glUniform3fv(m_uSceneSizeLocation, 1, glm::value_ptr(frustrumTopRight_view / frustrumTopRight_view.w));
-
-      glBindVertexArray(vaoTriangle);
-      glDrawArrays(GL_TRIANGLES, 0, 3);
-      glBindVertexArray(0);
-
-    }*/ else {
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-      glReadBuffer(GL_COLOR_ATTACHMENT0 + currentlyDisplayed);
-      glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-    }
+      } // else {
+    //   glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+    //   glReadBuffer(GL_COLOR_ATTACHMENT0 + currentlyDisplayed);
+    //   glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    //   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    // }
 
 		glmlv::imguiNewFrame(); // Création de la fenêtre
 
@@ -451,15 +418,15 @@ int Application::run()
                 ImGui::InputFloat3("Position", glm::value_ptr(pointLightPosition));
             }
 
-            if (ImGui::CollapsingHeader("GBuffer")) {
-                for (int32_t i = GPosition; i < GDepth; ++i)
-                {
-                    const char* gBufferTexNames[GBufferTextureCount] = {"Position", "Normal", "Ambient", "Diffuse", "GlossyShininess", "Depth"};
-                    if (ImGui::RadioButton(gBufferTexNames[i], currentlyDisplayed == i)) {
-                      currentlyDisplayed = GBufferTextureType(i);
-                    }
-                }
-            }
+            // if (ImGui::CollapsingHeader("GBuffer")) {
+            //     for (int32_t i = GPosition; i < GDepth; ++i)
+            //     {
+            //         const char* gBufferTexNames[GBufferTextureCount] = {"Position", "Normal", "Ambient", "Diffuse", "GlossyShininess", "Depth"};
+            //         if (ImGui::RadioButton(gBufferTexNames[i], currentlyDisplayed == i)) {
+            //           currentlyDisplayed = GBufferTextureType(i);
+            //         }
+            //     }
+            // }
 
             ImGui::End();
         }

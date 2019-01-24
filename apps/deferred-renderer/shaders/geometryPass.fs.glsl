@@ -27,12 +27,17 @@ uniform sampler2D uShininessSampler;
 
 void main() {
 
-    fAmbient = uKa * vec3(texture(uKaSampler, vFragTexCoords));
-    fDiffuse = uKd * vec3(texture(uKdSampler, vFragTexCoords));
+    fPosition = vFragPosition;
+    fNormal = normalize(vFragNormal);
+
+    vec3 ka = uKa * vec3(texture(uKaSampler, vFragTexCoords));
+    vec3 kd = uKd * vec3(texture(uKdSampler, vFragTexCoords));
     vec3 ks = uKs * vec3(texture(uKsSampler, vFragTexCoords));
     float shininess = uShininess * vec3(texture(uShininessSampler, vFragTexCoords)).x;
+
+    fAmbient = ka;
+    fDiffuse = kd;
     fGlossyShininess = vec4(ks, shininess);
 
-    fNormal = normalize(vFragNormal);
-    fPosition = vFragPosition;
+
 };

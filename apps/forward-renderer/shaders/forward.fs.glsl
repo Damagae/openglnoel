@@ -47,7 +47,7 @@ void main() {
     vec3 hDirLight = normalize(eyeDir + uDirectionalLightDir);
 
     float dothPointLight = shininess == 0 ? 1.f : max(0.f, dot(normal, hPointLight));
-    float dothDirLight = shininess == 0 ? 1.f :max(0.f, dot(normal, hDirLight));
+    float dothDirLight = shininess == 0 ? 1.f : max(0.f, dot(normal, hDirLight));
 
     if (shininess != 1.f && shininess != 0.f)
     {
