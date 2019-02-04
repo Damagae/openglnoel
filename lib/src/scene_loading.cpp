@@ -26,9 +26,9 @@ glm::mat4 aiMatrixToGlmMatrix(const aiMatrix4x4 & mat)
 	auto copy = mat;
 	copy.Transpose();
 	return glm::mat4(
-		copy.a1, copy.a2, copy.a3, copy.a4, 
+		copy.a1, copy.a2, copy.a3, copy.a4,
 		copy.b1, copy.b2, copy.b3, copy.b4,
-		copy.c1, copy.c2, copy.c3, copy.c4, 
+		copy.c1, copy.c2, copy.c3, copy.c4,
 		copy.d1, copy.d2, copy.d3, copy.d4
 	);
 }
@@ -48,7 +48,7 @@ void loadAssimpScene(const fs::path & objPath, const fs::path & mtlBaseDir, Scen
 	std::unordered_map<std::string, int32_t> textureIds;
 
 	const auto materialIdOffset = data.materials.size();
-	
+
 	while (!nodes.empty())
 	{
 		const auto node = nodes.top().first;
@@ -87,7 +87,7 @@ void loadAssimpScene(const fs::path & objPath, const fs::path & mtlBaseDir, Scen
 			{
 				aiFace face = mesh->mFaces[i];
 				assert(face.mNumIndices == 3);
-				for (unsigned int j = 0; j < face.mNumIndices; j++) 
+				for (unsigned int j = 0; j < face.mNumIndices; j++)
 				{
 					const auto index = uint32_t(indexOffset + face.mIndices[j]);
 					data.indexBuffer.emplace_back(index);

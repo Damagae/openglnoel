@@ -5,8 +5,11 @@
 #include <glmlv/GLProgram.hpp>
 #include <glmlv/ViewController.hpp>
 #include <glmlv/simple_geometry.hpp>
+#include <glmlv/filesystem.hpp>
+#include <glmlv/scene_loading.hpp>
 
 #include <glm/glm.hpp>
+#include <tiny_gltf.h>
 
 #include <limits>
 
@@ -21,6 +24,8 @@ class Application {
 
     void initScene(const glmlv::fs::path & objPath);
     void initShadersData();
+    void loadTinyGltfObject(const glmlv::fs::path & objPath, glmlv::SceneData & data);
+    // void setupMeshState(tinygltf::Model &model, GLuint progId);
 
     static glm::vec3 computeDirectionVector(float phiRadians, float thetaRadians) {
         const auto cosPhi = glm::cos(phiRadians);
@@ -67,6 +72,9 @@ class Application {
     GLuint m_SceneVBO = 0;
     GLuint m_SceneIBO = 0;
     GLuint m_SceneVAO = 0;
+
+    tinygltf::Model m_Model;
+    tinygltf::TinyGLTF m_Loader;
 
 
     // Scene data structure

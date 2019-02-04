@@ -3,14 +3,18 @@
 #include <iostream>
 #include <unordered_set>
 #include <algorithm>
+#include <stack>
+#include <unordered_map>
 
 #include <imgui.h>
 #include <glmlv/Image2DRGBA.hpp>
-#include <glmlv/scene_loading.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
+
+#define TINYGLTF_IMPLEMENTATION
+#include <tiny_gltf.h>
 
 int Application::run() {
 
@@ -290,15 +294,15 @@ void Application::initScene(const glmlv::fs::path & objPath) {
   glGenBuffers(1, &m_SceneIBO);
 
   {
+    // glTF
     glmlv::SceneData data;
-    loadObjScene(objPath, data);
     m_SceneSize = data.bboxMax - data.bboxMin;
     m_SceneSizeLength = glm::length(m_SceneSize);
 
     std::cout << "# of shapes    : " << data.shapeCount << std::endl;
     std::cout << "# of materials : " << data.materials.size() << std::endl;
     std::cout << "# of vertex    : " << data.vertexBuffer.size() << std::endl;
-    std::cout << "# of triangles    : " << data.indexBuffer.size() / 3 << std::endl;
+    std::cout << "# of triangles : " << data.indexBuffer.size() / 3 << std::endl;
 
     // Fill VBO
     glBindBuffer(GL_ARRAY_BUFFER, m_SceneVBO);
@@ -436,3 +440,180 @@ void Application::initShadersData() {
   m_uGPositionSamplerLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uGPosition");
   m_uSceneSizeLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uSceneSize");
 }
+
+void Application::loadTinyGltfObject(const glmlv::fs::path & objPath, glmlv::SceneData & data) {
+
+  auto mtlBaseDir = objPath.parent_path();
+
+  // Loading object
+  tinygltf::Model model;
+  tinygltf::TinyGLTF loader;
+  std::string err;
+  std::string warn;
+
+  bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, objPath);
+
+  if (!warn.empty()) {
+    std::cerr << "Warn: " << warn.c_str() << std::endl;
+  }
+  if (!err.empty()) {
+    std::cerr << "Err: " << err.c_str() << std::endl;
+  }
+  if (!ret) {
+    std::cerr << "Failed to parse glTF" << std::endl;
+    exit(-1);
+  }
+
+  std::stack<std::pair<tinygltf::Node*, std::vector<double>>> nodes;
+	nodes.push(std::make_pair(&model.nodes[0], model.nodes[0].matrix));
+
+  std::unordered_map<std::string, int32_t> textureIds;
+
+	const auto materialIdOffset = data.materials.size();
+
+  while (!nodes.empty()) {
+    const auto node = nodes.top().first;
+		const auto localToWorldMatrix = nodes.top().second;
+		nodes.pop();
+
+    data.shapeCount += 1;
+    tinygltf::Mesh mesh = model.meshes[node->mesh];
+    const auto indexOffset = data.vertexBuffer.size();
+
+    data.vertexBuffer = model.buffers[bufferView.buffer].data;
+  }
+  // For each Node
+  // --- shape count
+
+  // For each Mesh
+  // --- vb
+    // For each Vertice (primitive)
+
+  //data.indexCountPerShape
+  //data.localToWorldMatrixPerShape
+  //data.indexBuffer
+
+
+}
+
+
+// void Application::drawModel(tinygltf::Model &model) {
+//     //If the glTF asset has at least one scene, and doesn't define a default one
+//     //just show the first one we can find
+//     assert(model.scenes.size() > 0);
+//     auto modelMatrix = glm::mat4(1);
+//     int scene_to_display = model.defaultScene > -1 ? model.defaultScene : 0;
+//     const tinygltf::Scene &scene = model.scenes[scene_to_display];
+//     for (size_t i = 0; i < scene.nodes.size(); i++) {
+//       drawNode(model, model.nodes[scene.nodes[i]], modelMatrix);
+//     }
+// }
+//
+// void Application::drawNode(tinygltf::Model &model, const tinygltf::Node &node, glm::mat4 &modelMatrix) {
+//
+//   const auto scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+//   const float rotationAngle = node.rotation[0];
+//   const auto rotationAxis = glm::vec3(node.rotation[1], node.rotation[2], node.rotation[3]);
+//   const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+//   modelMatrix = glm::scale(modelMatrix, scale);
+//   modelMatrix = glm::rotate(modelMatrix, rotationAngle, rotationAxis);
+//   modelMatrix = glm::translate(modelMatrix, translation);
+//
+//   if (node.mesh > -1) {
+//     assert(node.mesh < model.meshes.size());
+//     drawMesh(model, model.meshes[node.mesh], modelMatrix);
+//   }
+//
+//   // Draw child nodes.
+//   for (size_t i = 0; i < node.children.size(); i++) {
+//     assert(node.children[i] < model.nodes.size());
+//     drawNode(model, model.nodes[node.children[i]], modelMatrix);
+//   }
+// }
+//
+// void Application::drawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh, glm::mat4 &modelMatrix) {
+//
+//   if (gGLProgramState.uniforms["isCurvesLoc"] >= 0) {
+//     glUniform1i(gGLProgramState.uniforms["isCurvesLoc"], 0);
+//   }
+//
+//   for (size_t i = 0; i < mesh.primitives.size(); i++) {
+//     const tinygltf::Primitive &primitive = mesh.primitives[i];
+//
+//     if (primitive.indices < 0) return;
+//
+//     // Assume TEXTURE_2D target for the texture object.
+//     // glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
+//
+//     std::map<std::string, int>::const_iterator it( primitive.attributes.begin() );
+//     std::map<std::string, int>::const_iterator itEnd( primitive.attributes.end() );
+//
+//     for (; it != itEnd; it++) {
+//       assert(it->second >= 0);
+//       const tinygltf::Accessor &accessor = model.accessors[it->second];
+//       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
+//       int size = 1;
+//       if (accessor.type == TINYGLTF_TYPE_SCALAR) {
+//         size = 1;
+//       } else if (accessor.type == TINYGLTF_TYPE_VEC2) {
+//         size = 2;
+//       } else if (accessor.type == TINYGLTF_TYPE_VEC3) {
+//         size = 3;
+//       } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
+//         size = 4;
+//       } else {
+//         assert(0);
+//       }
+//       // it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
+//       if ((it->first.compare("POSITION") == 0) || (it->first.compare("NORMAL") == 0) || (it->first.compare("TEXCOORD_0") == 0)) {
+//         if (gGLProgramState.attribs[it->first] >= 0) {
+//           // Compute byteStride from Accessor + BufferView combination.
+//           int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+//           assert(byteStride != -1);
+//           glVertexAttribPointer(gGLProgramState.attribs[it->first], size,
+//                                 accessor.componentType, accessor.normalized ? GL_TRUE : GL_FALSE,
+//                                 byteStride,
+//                                 BUFFER_OFFSET(accessor.byteOffset));
+//           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
+//         }
+//       }
+//     }
+//
+//     const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gBufferState[indexAccessor.bufferView].vb);
+//     int mode = -1;
+//     if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
+//       mode = GL_TRIANGLES;
+//     } else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) {
+//       mode = GL_TRIANGLE_STRIP;
+//     } else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) {
+//       mode = GL_TRIANGLE_FAN;
+//     } else if (primitive.mode == TINYGLTF_MODE_POINTS) {
+//       mode = GL_POINTS;
+//     } else if (primitive.mode == TINYGLTF_MODE_LINE) {
+//       mode = GL_LINES;
+//     } else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
+//       mode = GL_LINE_LOOP;
+//     } else {
+//       assert(0);
+//     }
+//     glDrawElements(mode, indexAccessor.count, indexAccessor.componentType, BUFFER_OFFSET(indexAccessor.byteOffset));
+//
+//     {
+//       std::map<std::string, int>::const_iterator it( primitive.attributes.begin() );
+//       std::map<std::string, int>::const_iterator itEnd( primitive.attributes.end() );
+//
+//       for (; it != itEnd; it++) {
+//         if ((it->first.compare("POSITION") == 0) || (it->first.compare("NORMAL") == 0) || (it->first.compare("TEXCOORD_0") == 0)) {
+//           if (gGLProgramState.attribs[it->first] >= 0) {
+//             glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+//
+// char* Application::BUFFER_OFFSET(int i) {
+//   return (char *)NULL + (i);
+// }
