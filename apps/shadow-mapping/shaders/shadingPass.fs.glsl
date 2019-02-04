@@ -11,6 +11,10 @@ uniform sampler2D uGAmbient;
 uniform sampler2D uGDiffuse;
 uniform sampler2D uGGlossyShininess;
 
+uniform mat4 uDirLightViewProjMatrix;
+uniform sampler2D uDirLightShadowMap;
+uniform float uDirLightShadowMapBias;
+
 out vec3 fFragColor;
 
 void main() {
@@ -29,6 +33,11 @@ void main() {
     vec3 dirToPointLight = (uPointLightPosition - GPosition) / distToPointLight;
     vec3 pointLightIncidentLight = uPointLightIntensity / (distToPointLight * distToPointLight);
 
+    vec4 positionInDirLightScreen = uDirLightViewProjMatrix * vec4(position, 1); // applique la matrice pour projeter la position du fragment courant
+    vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5; // homogénise cette position projetée en divisant par la coordonnée "w" -entre 0 et 1
+    float depthBlockerInDirSpace = texture(uDirLightShadowMap, positionInDirLightNDC.xy).r; //  lit la depth stockée dans la shadow map à la position du fragment
+    float dirLightVisibility = positionInDirLightNDC.z < depthBlockerInDirSpace + uDirLightShadowMapBias ? 1.0 : 0.0; // compare la depth stockée à la depth du fragment afin de savoir si la light est visible
+
     // half vectors, for blinn-phong shading
     vec3 hPointLight = normalize(position + dirToPointLight);
     vec3 hDirLight = normalize(position + uDirectionalLightDir);
@@ -44,5 +53,5 @@ void main() {
 
     fFragColor = ka; // OK
     fFragColor += kd * (uDirectionalLightIntensity * max(0.f, dot(normal, uDirectionalLightDir)) + pointLightIncidentLight * max(0., dot(normal, dirToPointLight)));
-    fFragColor += ks * (uDirectionalLightIntensity * dothDirLight + pointLightIncidentLight * dothPointLight);
+    fFragColor += ks * (uDirectionalLightIntensity * dothDirLight * dirLightVisibility + pointLightIncidentLight * dothPointLight);
 };

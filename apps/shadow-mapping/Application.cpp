@@ -118,13 +118,45 @@ int Application::run()
   }
   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gBufferTextures[5], 0); // GDepth
   glDrawBuffers(5, drawBuffers);
-  const auto status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-  if (status != GL_FRAMEBUFFER_COMPLETE) {
-    std::cerr << "FrameBuffer failed - status : " << status << std::endl;
+  const auto statusFBO = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+  if (statusFBO != GL_FRAMEBUFFER_COMPLETE) {
+    std::cerr << "FrameBuffer failed - statusFBO : " << statusFBO << std::endl;
   } else {
-    std::cout << "FrameBuffer OK" << std::endl;
+    std::cout << "FBO OK" << std::endl;
   }
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+  // SHADDOW MAPPING -----------------------------------------------------------
+  // --- Textures
+  GLuint directionalSMTexture; // identifiant de texture OpenGL qui contiend la depth map selon le point de vue de la light
+  GLuint directionalSMFBO; // identifiant de framebuffer OpenGL pour dessiner la depth map
+  GLuint directionalSMSampler; // identifiant de sampler OpenGL pour lire la depth map depuis un shader
+  int32_t nDirectionalSMResolution = 512; // résolution de la depth map
+
+  glGenTextures(1, &directionalSMTexture);
+  glBindTexture(GL_TEXTURE_2D, directionalSMTexture);
+  glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, 1, 1);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // --- FBO
+  glGenFramebuffers(1, &directionalSMFBO);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)directionalSMFBO);
+  glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, directionalSMTexture, 0);
+  glDrawBuffers(5, drawBuffers);
+  const auto statusSMFBO = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+  if (statusSMFBO != GL_FRAMEBUFFER_COMPLETE) {
+    std::cerr << "FrameBuffer failed - statusSMFBO : " << statusSMFBO << std::endl;
+  } else {
+    std::cout << "SMFBO OK" << std::endl;
+  }
+
+  // --- Samplers
+  glGenSamplers(1, &directionalSMSampler);
+  glSamplerParameteri(directionalSMSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glSamplerParameteri(directionalSMSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glSamplerParameteri(directionalSMSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+  glSamplerParameteri(directionalSMSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
 
   // TRIANGLE -----------------------------------------------------------------
     GLuint vboTriangle;
@@ -203,7 +235,7 @@ int Application::run()
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  // PROGRAM -------------------------------------------------------------------
+  // PROGRAMS -------------------------------------------------------------------
   const auto pathToVSGeometry = shadersRootPath / m_AppName / "geometryPass.vs.glsl";
   const auto pathToFSGeometry = shadersRootPath / m_AppName / "geometryPass.fs.glsl";
   std::vector<std::experimental::filesystem::v1::__cxx11::path> shadersGeometry;
@@ -218,6 +250,13 @@ int Application::run()
   shadersShading.push_back(pathToFSShading);
   const glmlv::GLProgram programShading = glmlv::compileProgram(shadersShading);
 
+  const auto pathToVSDirSM = shadersRootPath / m_AppName / "shadingPass.vs.glsl";
+  const auto pathToFSDirSM = shadersRootPath / m_AppName / "shadingPass.fs.glsl";
+  std::vector<std::experimental::filesystem::v1::__cxx11::path> shadersDirSM;
+  shadersDirSM.push_back(pathToVSDirSM);
+  shadersDirSM.push_back(pathToFSDirSM);
+  const glmlv::GLProgram programDirSM = glmlv::compileProgram(shadersDirSM);
+
   // VARIABLES UNIFORMES -------------------------------------------------------
   // Récupérer les locations des variables uniform
   const auto ulMVPMatrix = programGeometry.getUniformLocation("uMVPMatrix");
@@ -228,6 +267,11 @@ int Application::run()
   const auto ulDirectionalLightIntensity = programShading.getUniformLocation("uDirectionalLightIntensity");
   const auto ulPointLightPosition = programShading.getUniformLocation("uPointLightPosition");
   const auto ulPointLightIntensity = programShading.getUniformLocation("uPointLightIntensity");
+
+  const auto ulDirLightViewProjMatrixSP = programShading.getUniformLocation("uDirLightViewProjMatrix");
+  const auto ulDirLightShadowMap = programShading.getUniformLocation("uDirLightShadowMap");
+  const auto ulDirLightShadowMapBias = programShading.getUniformLocation("uDirLightShadowMapBias");
+
   // --- liées aux textures et matériaux
   const auto ulKa = programGeometry.getUniformLocation("uKa");
   const auto ulKd = programGeometry.getUniformLocation("uKd");
@@ -244,6 +288,9 @@ int Application::run()
   ulGBufferSamplers[GAmbient] = programShading.getUniformLocation("uGAmbient");
   ulGBufferSamplers[GDiffuse] = programShading.getUniformLocation("uGDiffuse");
   ulGBufferSamplers[GGlossyShininess] = programShading.getUniformLocation("uGGlossyShininess");
+  // --- Dir Shadow Mapping
+  const auto ulDirLightViewProjMatrix = programDirSM.getUniformLocation("uDirLightViewProjMatrix");
+
 
   // LIGHTS --------------------------------------------------------------------
   float dirLightPhiAngleDegrees = 90.f;
@@ -260,6 +307,9 @@ int Application::run()
   // GBufferTextureType currentlyDisplayed = GDiffuse;
   GBufferTextureType currentlyDisplayed = GBufferTextureCount;
 
+  // ACTIVATION DIRSM ----------------------------------------------------------
+   bool directionalSMDirty = true;
+
   // ---------------------------------------------------------------------------
   // LOOP
   // ---------------------------------------------------------------------------
@@ -269,10 +319,53 @@ int Application::run()
 
   for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
   {
-    const auto seconds = glfwGetTime();
+
+    static const auto computeDirectionVectorUp = [](float phiRadians, float thetaRadians) {
+        const auto cosPhi = glm::cos(phiRadians);
+        const auto sinPhi = glm::sin(phiRadians);
+        const auto cosTheta = glm::cos(thetaRadians);
+        return -glm::normalize(glm::vec3(sinPhi * cosTheta, -glm::sin(thetaRadians), cosPhi * cosTheta));
+    };
+
+    const auto sceneCenter = 0.5f * (scene.bboxMax + scene.bboxMin);
+    const float sceneRadius = sceneSize * 0.5f;
+
+    const auto dirLightUpVector = computeDirectionVectorUp(glm::radians(dirLightPhiAngleDegrees), glm::radians(dirLightThetaAngleDegrees));
+    const auto dirLightViewMatrix = glm::lookAt(sceneCenter + dirLightDirection * sceneRadius, sceneCenter, dirLightUpVector); // Will not work if DirLightDirection is colinear to lightUpVector
+    const auto dirLightProjMatrix = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.01f * sceneRadius, 2.f * sceneRadius);
+
+    if (directionalSMDirty) {
+      // Calcul de la shadow map (**)
+
+      programDirSM.use();
+
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, directionalSMFBO);
+      glViewport(0, 0, nDirectionalSMResolution, nDirectionalSMResolution);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      glUniformMatrix4fv(ulDirLightViewProjMatrix, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix));
+
+      glBindVertexArray(vaoScene);
+
+      // We draw each shape by specifying how much indices it carries, and with an offset in the global index buffer
+      for (const auto shape : shapes) {
+          glDrawElements(GL_TRIANGLES, shape.indexCount, GL_UNSIGNED_INT, (const GLvoid*)(shape.indexOffset * sizeof(GLuint)));
+      }
+
+      glBindVertexArray(0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+      directionalSMDirty = false; // Pas de calcul au prochain tour
+    }
 
     // Rendering code -------------------------------
-  	const auto fbSize = m_GLFWHandle.framebufferSize();
+    const auto seconds = glfwGetTime();
+
+    const auto fbSize = m_GLFWHandle.framebufferSize();
+
+    // Matrices View et Projection
+    const auto sceneProjMatrix = glm::perspective(70.f, float(fbSize.x) / fbSize.y, 0.01f * sceneSize, sceneSize); // near = 1% de la taille de la scene, far = 100
+    const auto viewMatrix = viewController.getViewMatrix();
 
     programGeometry.use();
 
@@ -281,10 +374,6 @@ int Application::run()
 
   	glViewport(0, 0, fbSize.x, fbSize.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Matrices View et Projection
-    const auto sceneProjMatrix = glm::perspective(70.f, float(fbSize.x) / fbSize.y, 0.01f * sceneSize, sceneSize); // near = 1% de la taille de la scene, far = 100
-    const auto viewMatrix = viewController.getViewMatrix();
 
     // Samplers
     for (GLuint i : {0, 1, 2, 3}) {
@@ -417,6 +506,11 @@ int Application::run()
                 ImGui::DragFloat("PointLightIntensity", &pointLightIntensity, 0.1f, 0.f, 16000.f);
                 ImGui::InputFloat3("Position", glm::value_ptr(pointLightPosition));
             }
+
+            // // Pseudo code dans le dessin de la GUI:
+            // if (directional_light_change) {
+            //  directionalSMDirty = true; // Il faut recalculer la shadow map
+            // }
 
             // if (ImGui::CollapsingHeader("GBuffer")) {
             //     for (int32_t i = GPosition; i < GDepth; ++i)
