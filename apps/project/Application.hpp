@@ -36,7 +36,7 @@ class Application {
 
     const size_t m_nWindowWidth = 1280;
     const size_t m_nWindowHeight = 720;
-    glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
+    glmlv::GLFWHandle m_GLFWHandle{ (int)m_nWindowWidth, (int)m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
 
     const glmlv::fs::path m_AppPath;
     const std::string m_AppName;

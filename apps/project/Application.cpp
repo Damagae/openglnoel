@@ -296,6 +296,8 @@ void Application::initScene(const glmlv::fs::path & objPath) {
   {
     // glTF
     glmlv::SceneData data;
+    loadTinyGltfObject(objPath, data);
+    exit(-1);
     m_SceneSize = data.bboxMax - data.bboxMin;
     m_SceneSizeLength = glm::length(m_SceneSize);
 
@@ -441,6 +443,7 @@ void Application::initShadersData() {
   m_uSceneSizeLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uSceneSize");
 }
 
+
 void Application::loadTinyGltfObject(const glmlv::fs::path & objPath, glmlv::SceneData & data) {
 
   auto mtlBaseDir = objPath.parent_path();
@@ -477,10 +480,34 @@ void Application::loadTinyGltfObject(const glmlv::fs::path & objPath, glmlv::Sce
 		nodes.pop();
 
     data.shapeCount += 1;
-    tinygltf::Mesh mesh = model.meshes[node->mesh];
-    const auto indexOffset = data.vertexBuffer.size();
+    std::cout << node->mesh << std::endl;
+    if (node->mesh > -1) {
+      std::cout << node->mesh << std::endl;
+      tinygltf::Mesh mesh = model.meshes[node->mesh];
+      // const auto indexOffset = data.vertexBuffer.size();
 
-    data.vertexBuffer = model.buffers[bufferView.buffer].data;
+      // data.vertexBuffer.reserve(data.vertexBuffer.size() + model.bufferViews.size());
+      // for (auto id = 0; id < model.bufferViews.size(); ++id)
+      // {
+      //   const tinygltf::BufferView &bufferView = model.bufferViews[id];
+      //   if (bufferView.target == 0) {
+      //     std::cout << "WARN: bufferView.target is zero" << std::endl;
+      //     continue;
+      //   }
+      //
+      //   tinygltf::Buffer buffer = model.buffers[bufferView.buffer];
+      //   std::cout << "bufferview.target " << bufferView.target << std::endl;
+      //
+      //   std::cout << buffer.data.at(0) << std::endl;
+      //
+      //   // data.vertexBuffer.emplace_back(buffer.data.at(0) + bufferView.byteOffset);
+      // }
+    }
+
+    // for (auto childIdx = 0; childIdx < node->children.size(); ++childIdx) {
+		// 	nodes.push(std::make_pair(model.nodes[node.children[childIdx]], model.nodes[node.children[childIdx]].matrix * localToWorldMatrix));
+		// }
+
   }
   // For each Node
   // --- shape count
