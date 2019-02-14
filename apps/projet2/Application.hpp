@@ -22,7 +22,8 @@ private:
     void initScene(const glmlv::fs::path & objPath);
 
     void initShadersData();
-    void loadGLTFModel(const glmlv::fs::path & objPath);
+    void loadGLTFModel(const glmlv::fs::path & objPath, glmlv::SceneData & data);
+    void traverseNode(const tinygltf::Model model, tinygltf::Node node, glmlv::SceneData & data);
 
     static void printNodes(const tinygltf::Scene &scene) {
       for (size_t i = 0; i < scene.nodes.size(); i++) {

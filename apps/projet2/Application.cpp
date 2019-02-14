@@ -306,7 +306,7 @@ void Application::initScene(const glmlv::fs::path & objPath)
 
     {
         glmlv::SceneData data;
-        loadGLTFModel(objPath);
+        loadGLTFModel(objPath, data);
 
         // TODO
         // m_SceneSize = data.bboxMax - data.bboxMin;
@@ -534,7 +534,7 @@ void Application::initShadersData()
     m_uSceneSizeLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uSceneSize");
 }
 
-void Application::loadGLTFModel(const glmlv::fs::path & objPath) {
+void Application::loadGLTFModel(const glmlv::fs::path & objPath, glmlv::SceneData & data) {
   tinygltf::TinyGLTF loader;
   std::string err;
   std::string warn;
@@ -566,7 +566,81 @@ void Application::loadGLTFModel(const glmlv::fs::path & objPath) {
   const auto defaultScene = m_Model.scenes[m_Model.defaultScene > -1 ? m_Model.defaultScene : 0];
   printNodes(defaultScene);
 
+  // Fields ----------
+  // glm::vec3 bboxMin = glm::vec3(std::numeric_limits<float>::max());
+  // glm::vec3 bboxMax = glm::vec3(std::numeric_limits<float>::lowest());
+  //
+  // std::vector<Vertex3f3f2f> vertexBuffer; // Tableau de sommets
+  // std::vector<uint32_t> indexBuffer; // Tableau d'index de sommets
+  //
+	// size_t shapeCount = 0; // Nombre d'objets à dessiner
+  // std::vector<uint32_t> indexCountPerShape; // Nomber d'index de sommets pour chaque objet
+	// std::vector<glm::mat4> localToWorldMatrixPerShape; // Matrice localToWorld de chaque objet
+  // std::vector<int32_t> materialIDPerShape; // Index du materiau de chaque objet (-1 si pas de materiaux)
+  //
+  // std::vector<PhongMaterial> materials; // Tableau des materiaux
+  // std::vector<Image2DRGBA> textures; // Tableau des textures référencées par les materiaux
+
   auto model = m_Model;
 
-  
+  assert(model.scenes.size() > 0);
+  int scene_to_display = model.defaultScene > -1 ? model.defaultScene : 0;
+  const tinygltf::Scene &scene = model.scenes[scene_to_display];
+
+  for (size_t i = 0; i < scene.nodes.size(); i++) {
+    tinygltf::Node &node = model.nodes[scene.nodes[i]];
+    traverseNode(model, node, data);
+  }
+
+}
+
+void Application::traverseNode(const tinygltf::Model model, tinygltf::Node node, glmlv::SceneData & data) {
+  auto matrix = node.matrix.data();
+  tinygltf::Mesh mesh = model.meshes[node.mesh];
+
+  for (size_t i = 0; i < mesh.primitives.size(); i++) {
+
+    // const tinygltf::Primitive &primitive = mesh.primitives[i];
+    // if (primitive.indices < 0) { break; }
+    //
+    // std::map<std::string, int>::const_iterator it(primitive.attributes.begin());
+    // std::map<std::string, int>::const_iterator itEnd(primitive.attributes.end());
+//
+//     for (; it != itEnd; it++) {
+//       assert(it->second >= 0);
+//       const tinygltf::Accessor &accessor = model.accessors[it->second];
+//
+//       GLuint vbo = m_GBufferState[accessor.bufferView];
+//
+//       int size = 1;
+//       if (accessor.type == TINYGLTF_TYPE_SCALAR) { size = 1; }
+//       else if (accessor.type == TINYGLTF_TYPE_VEC2) { size = 2; }
+//       else if (accessor.type == TINYGLTF_TYPE_VEC3) { size = 3; }
+//       else if (accessor.type == TINYGLTF_TYPE_VEC4) { size = 4; }
+//       else { assert(0); }
+//
+//       int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+//
+//     }
+//
+    // const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+
+    // int mode = -1;
+    // if (primitive.mode == TINYGLTF_MODE_TRIANGLES) { mode = GL_TRIANGLES; }
+    // else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) { mode = GL_TRIANGLE_STRIP; }
+    // else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) { mode = GL_TRIANGLE_FAN; }
+    // else if (primitive.mode == TINYGLTF_MODE_POINTS) { mode = GL_POINTS; }
+    // else if (primitive.mode == TINYGLTF_MODE_LINE) { mode = GL_LINES; }
+    // else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) { mode = GL_LINE_LOOP; }
+
+    // GL_TRIANGLES = mode
+    // shape.indexCount = indexAccessor.count
+    // GL_UNSIGNED_INT = indexAccessor.componentType
+    // (const GLvoid*)(shape.indexOffset * sizeof(GLuint)) = BUFFER_OFFSET(indexAccessor.byteOffset)
+  }
+  for (size_t i = 0; i < node.children.size(); i++) {
+    assert(node.children[i] < model.nodes.size());
+    traverseNode(model, model.nodes[node.children[i]], data);
+  }
+  std::cout << "\n";
 }
