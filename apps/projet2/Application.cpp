@@ -620,16 +620,18 @@ void Application::traverseNode(const tinygltf::Model model, tinygltf::Node node,
         assert(it->second >= 0);
         const tinygltf::Accessor &accessor = model.accessors[it->second]; // fetch the accessor
 
+        std::cout << "accessor name = " << accessor.name << std::endl;
+
         GLuint vbo = m_GBufferState[accessor.bufferView]; // find the vbo ?
 
-        // int size = 1;
-        // if (accessor.type == TINYGLTF_TYPE_SCALAR) { size = 1; }
-        // else if (accessor.type == TINYGLTF_TYPE_VEC2) { size = 2; }
-        // else if (accessor.type == TINYGLTF_TYPE_VEC3) { size = 3; }
-        // else if (accessor.type == TINYGLTF_TYPE_VEC4) { size = 4; }
-        // else { assert(0); }
-        //
-        // int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+        int size = 1;
+        if (accessor.type == TINYGLTF_TYPE_SCALAR) { size = 1; }
+        else if (accessor.type == TINYGLTF_TYPE_VEC2) { size = 2; }
+        else if (accessor.type == TINYGLTF_TYPE_VEC3) { size = 3; }
+        else if (accessor.type == TINYGLTF_TYPE_VEC4) { size = 4; }
+        else { assert(0); }
+
+        int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
 
       }
 
@@ -643,10 +645,10 @@ void Application::traverseNode(const tinygltf::Model model, tinygltf::Node node,
       else if (primitive.mode == TINYGLTF_MODE_LINE) { mode = GL_LINES; }
       else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) { mode = GL_LINE_LOOP; }
 
-      uint32_t newIndex = data.vertexBuffer.size();
-      // data.vertexBuffer.emplace_back();
-      data.bboxMin = glm::min(data.bboxMin, data.vertexBuffer.back().position);
-      data.bboxMax = glm::max(data.bboxMax, data.vertexBuffer.back().position);
+      // uint32_t newIndex = data.vertexBuffer.size();
+      // // data.vertexBuffer.emplace_back();
+      // data.bboxMin = glm::min(data.bboxMin, data.vertexBuffer.back().position);
+      // data.bboxMax = glm::max(data.bboxMax, data.vertexBuffer.back().position);
 
       // Indications
       // GL_TRIANGLES == mode
