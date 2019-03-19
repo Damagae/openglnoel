@@ -582,16 +582,14 @@ void Application::loadGLTFModel(const glmlv::fs::path & objPath, glmlv::SceneDat
   // std::vector<PhongMaterial> materials; // Tableau des materiaux
   // std::vector<Image2DRGBA> textures; // Tableau des textures référencées par les materiaux
 
-  auto model = m_Model;
-
-  assert(model.scenes.size() > 0);
+  assert(m_Model.scenes.size() > 0);
   // int scene_to_display = model.defaultScene > -1 ? model.defaultScene : 0;
   // const tinygltf::Scene &scene = model.scenes[scene_to_display];
 
   // Foreach node in the model
-  for (size_t i = 0; i < model.nodes.size(); ++i) {
-    tinygltf::Node &node = model.nodes[i];
-    traverseNode(model, node, data); // we traverse
+  for (size_t i = 0; i < m_Model.nodes.size(); ++i) {
+    tinygltf::Node &node = m_Model.nodes[i];
+    traverseNode(m_Model, node, data); // we traverse
   }
   // for (size_t i = 0; i < scene.nodes.size(); ++i) {
   //   tinygltf::Node &node = model.nodes[scene.nodes[i]];
@@ -605,7 +603,8 @@ void Application::traverseNode(const tinygltf::Model model, tinygltf::Node node,
   auto meshIndex = node.mesh;
 
   if (meshIndex >= 0) {
-    tinygltf::Mesh mesh = model.meshes[node.mesh];
+    data.shapeCount += 1;
+    tinygltf::Mesh mesh = m_Model.meshes[node.mesh];
 
     // for each primitive in a mesh
     for (size_t i = 0; i < mesh.primitives.size(); i++) {
@@ -613,45 +612,54 @@ void Application::traverseNode(const tinygltf::Model model, tinygltf::Node node,
       const tinygltf::Primitive &primitive = mesh.primitives[i];
       if (primitive.indices < 0) { break; }
 
-      // std::map<std::string, int>::const_iterator it(primitive.attributes.begin());
-      // std::map<std::string, int>::const_iterator itEnd(primitive.attributes.end());
-  //
-  //     for (; it != itEnd; it++) {
-  //       assert(it->second >= 0);
-  //       const tinygltf::Accessor &accessor = model.accessors[it->second];
-  //
-  //       GLuint vbo = m_GBufferState[accessor.bufferView];
-  //
-  //       int size = 1;
-  //       if (accessor.type == TINYGLTF_TYPE_SCALAR) { size = 1; }
-  //       else if (accessor.type == TINYGLTF_TYPE_VEC2) { size = 2; }
-  //       else if (accessor.type == TINYGLTF_TYPE_VEC3) { size = 3; }
-  //       else if (accessor.type == TINYGLTF_TYPE_VEC4) { size = 4; }
-  //       else { assert(0); }
-  //
-  //       int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
-  //
-  //     }
-  //
-      // const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+      std::map<std::string, int>::const_iterator it(primitive.attributes.begin());
+      std::map<std::string, int>::const_iterator itEnd(primitive.attributes.end());
 
-      // int mode = -1;
-      // if (primitive.mode == TINYGLTF_MODE_TRIANGLES) { mode = GL_TRIANGLES; }
-      // else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) { mode = GL_TRIANGLE_STRIP; }
-      // else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) { mode = GL_TRIANGLE_FAN; }
-      // else if (primitive.mode == TINYGLTF_MODE_POINTS) { mode = GL_POINTS; }
-      // else if (primitive.mode == TINYGLTF_MODE_LINE) { mode = GL_LINES; }
-      // else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) { mode = GL_LINE_LOOP; }
+      // For each attribute of a primitive
+      for (; it != itEnd; it++) {
+        assert(it->second >= 0);
+        const tinygltf::Accessor &accessor = model.accessors[it->second]; // fetch the accessor
 
-      // GL_TRIANGLES = mode
-      // shape.indexCount = indexAccessor.count
-      // GL_UNSIGNED_INT = indexAccessor.componentType
-      // (const GLvoid*)(shape.indexOffset * sizeof(GLuint)) = BUFFER_OFFSET(indexAccessor.byteOffset)
+        GLuint vbo = m_GBufferState[accessor.bufferView]; // find the vbo ?
+
+        // int size = 1;
+        // if (accessor.type == TINYGLTF_TYPE_SCALAR) { size = 1; }
+        // else if (accessor.type == TINYGLTF_TYPE_VEC2) { size = 2; }
+        // else if (accessor.type == TINYGLTF_TYPE_VEC3) { size = 3; }
+        // else if (accessor.type == TINYGLTF_TYPE_VEC4) { size = 4; }
+        // else { assert(0); }
+        //
+        // int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+
+      }
+
+      const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+
+      int mode = -1;
+      if (primitive.mode == TINYGLTF_MODE_TRIANGLES) { mode = GL_TRIANGLES; }
+      else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) { mode = GL_TRIANGLE_STRIP; }
+      else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) { mode = GL_TRIANGLE_FAN; }
+      else if (primitive.mode == TINYGLTF_MODE_POINTS) { mode = GL_POINTS; }
+      else if (primitive.mode == TINYGLTF_MODE_LINE) { mode = GL_LINES; }
+      else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) { mode = GL_LINE_LOOP; }
+
+      uint32_t newIndex = data.vertexBuffer.size();
+      // data.vertexBuffer.emplace_back();
+      data.bboxMin = glm::min(data.bboxMin, data.vertexBuffer.back().position);
+      data.bboxMax = glm::max(data.bboxMax, data.vertexBuffer.back().position);
+
+      // Indications
+      // GL_TRIANGLES == mode
+      // shape.indexCount == indexAccessor.count
+      // GL_UNSIGNED_INT == indexAccessor.componentType
+      // (const GLvoid*)(shape.indexOffset * sizeof(GLuint)) == BUFFER_OFFSET(indexAccessor.byteOffset)
     }
+
     for (size_t i = 0; i < node.children.size(); i++) {
       assert(node.children[i] < model.nodes.size());
       traverseNode(model, model.nodes[node.children[i]], data);
     }
+
   }
 
 }
