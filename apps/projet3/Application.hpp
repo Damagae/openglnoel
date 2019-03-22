@@ -31,6 +31,16 @@ private:
       return "";
     }
 
+    static int getMode(int tinygltfMode) {
+      if (tinygltfMode == TINYGLTF_MODE_TRIANGLES) { return GL_TRIANGLES; }
+      else if (tinygltfMode == TINYGLTF_MODE_TRIANGLE_STRIP) { return GL_TRIANGLE_STRIP; }
+      else if (tinygltfMode == TINYGLTF_MODE_TRIANGLE_FAN) { return GL_TRIANGLE_FAN; }
+      else if (tinygltfMode == TINYGLTF_MODE_POINTS) { return GL_POINTS; }
+      else if (tinygltfMode == TINYGLTF_MODE_LINE) { return GL_LINES; }
+      else if (tinygltfMode == TINYGLTF_MODE_LINE_LOOP) { return GL_LINE_LOOP; }
+      return -1;
+    }
+
     const int m_nWindowWidth = 1280;
     const int m_nWindowHeight = 720;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
@@ -40,6 +50,11 @@ private:
     const std::string m_ImGuiIniFilename;
     const glmlv::fs::path m_ShadersRootPath;
     const glmlv::fs::path m_AssetsRootPath;
+
+    tinygltf::Model m_Model;
+
+    std::vector<GLuint> m_VAOs;
+    std::vector<tinygltf::Primitive> m_Primitives;
 
     glmlv::SimpleGeometry m_cubeGeometry;
     glmlv::SimpleGeometry m_sphereGeometry;
@@ -84,4 +99,5 @@ private:
 
     glm::vec3 m_CubeKd = glm::vec3(1, 0, 0);
     glm::vec3 m_SphereKd = glm::vec3(0, 1, 0);
+    glm::vec3 m_ModelKd = glm::vec3(0, 1, 0);
 };

@@ -21,7 +21,6 @@ int Application::run()
     {
         const auto seconds = glfwGetTime();
 
-        // Put here rendering code
         const auto viewportSize = m_GLFWHandle.framebufferSize();
         glViewport(0, 0, viewportSize.x, viewportSize.y);
 
@@ -40,42 +39,69 @@ int Application::run()
         glUniform1i(m_uKdSamplerLocation, 0); // Set the uniform to 0 because we use texture unit 0
         glBindSampler(0, m_textureSampler); // Tell to OpenGL what sampler we want to use on this texture unit
 
+        // {
+        //     const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+        //
+        //     const auto mvMatrix = viewMatrix * modelMatrix;
+        //     const auto mvpMatrix = projMatrix * mvMatrix;
+        //     const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
+        //
+        //     glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+        //     glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
+        //     glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+        //
+        //     glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_CubeKd));
+        //
+        //     glBindTexture(GL_TEXTURE_2D, m_cubeTextureKd);
+        //
+        //     glBindVertexArray(m_cubeVAO);
+        //     glDrawElements(GL_TRIANGLES, m_cubeGeometry.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
+        // }
+        //
+        // {
+        //     const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+        //
+        //     const auto mvMatrix = viewMatrix * modelMatrix;
+        //     const auto mvpMatrix = projMatrix * mvMatrix;
+        //     const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
+        //
+        //     glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+        //     glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
+        //     glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+        //
+        //     glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_SphereKd));
+        //
+        //     glBindTexture(GL_TEXTURE_2D, m_sphereTextureKd);
+        //
+        //     glBindVertexArray(m_sphereVAO);
+        //     glDrawElements(GL_TRIANGLES, m_sphereGeometry.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
+        // }
+
         {
-            const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(-2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+          const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0)), glm::vec3(0.02f, 0.02f, 0.02f));
+          // modelMatrix = glm::scale(modelMatrix, glm::vec3(0.5f, 0.5f, 0.5f));
 
-            const auto mvMatrix = viewMatrix * modelMatrix;
-            const auto mvpMatrix = projMatrix * mvMatrix;
-            const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
+          const auto mvMatrix = viewMatrix * modelMatrix;
+          const auto mvpMatrix = projMatrix * mvMatrix;
+          const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
 
-            glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
-            glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+          glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+          glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
+          glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 
-            glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_CubeKd));
+          glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_ModelKd));
 
-            glBindTexture(GL_TEXTURE_2D, m_cubeTextureKd);
 
-            glBindVertexArray(m_cubeVAO);
-            glDrawElements(GL_TRIANGLES, m_cubeGeometry.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
-        }
+          for (uint vaoIndex = 0; vaoIndex < m_VAOs.size(); ++vaoIndex) {
+            auto vao = m_VAOs[vaoIndex];
+            auto primitive = m_Primitives[vaoIndex];
+            glBindVertexArray(vao);
+            tinygltf::Accessor accessor = m_Model.accessors[primitive.indices];
 
-        {
-            const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
+            int mode = getMode(primitive.mode);
 
-            const auto mvMatrix = viewMatrix * modelMatrix;
-            const auto mvpMatrix = projMatrix * mvMatrix;
-            const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
-
-            glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
-            glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-
-            glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_SphereKd));
-
-            glBindTexture(GL_TEXTURE_2D, m_sphereTextureKd);
-
-            glBindVertexArray(m_sphereVAO);
-            glDrawElements(GL_TRIANGLES, m_sphereGeometry.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
+            glDrawElements(mode, accessor.count, accessor.componentType, (const void*) accessor.byteOffset);
+          }
         }
 
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -110,8 +136,7 @@ int Application::run()
 
             if (ImGui::CollapsingHeader("Materials"))
             {
-                ImGui::ColorEdit3("Cube Kd", glm::value_ptr(m_CubeKd));
-                ImGui::ColorEdit3("Sphere Kd", glm::value_ptr(m_SphereKd));
+                ImGui::ColorEdit3("Model Kd", glm::value_ptr(m_ModelKd));
             }
 
             ImGui::End();
@@ -154,8 +179,6 @@ Application::Application(int argc, char** argv):
     // Loading file ----------------
 
     const glmlv::fs::path objPath = glmlv::fs::path{ argv[1] };
-
-    tinygltf::Model model;
     tinygltf::TinyGLTF loader;
 
     std::string err;
@@ -167,10 +190,10 @@ Application::Application(int argc, char** argv):
     bool ret = false;
     if (ext.compare("glb") == 0) {
       // assume binary glTF.
-      ret = loader.LoadBinaryFromFile(&model, &err, &warn, objPath.c_str());
+      ret = loader.LoadBinaryFromFile(&m_Model, &err, &warn, objPath.c_str());
     } else {
       // assume ascii glTF.
-      ret = loader.LoadASCIIFromFile(&model, &err, &warn, objPath.c_str());
+      ret = loader.LoadASCIIFromFile(&m_Model, &err, &warn, objPath.c_str());
     }
 
     if (!warn.empty()) {
@@ -187,20 +210,15 @@ Application::Application(int argc, char** argv):
 
     // Fill buffers ----------------------
 
-    std::vector<GLuint> buffers(model.buffers.size());
+    std::vector<GLuint> buffers(m_Model.buffers.size());
 
     glGenBuffers(buffers.size(), buffers.data());
-    for (uint indexBuffer = 0; indexBuffer < model.buffers.size(); ++indexBuffer) {
+    for (uint indexBuffer = 0; indexBuffer < m_Model.buffers.size(); ++indexBuffer) {
       glBindBuffer(GL_ARRAY_BUFFER, buffers[indexBuffer]);
-      glBufferStorage(GL_ARRAY_BUFFER, model.buffers[indexBuffer].data.size(), model.buffers[indexBuffer].data.data(), 0);
+      glBufferStorage(GL_ARRAY_BUFFER, m_Model.buffers[indexBuffer].data.size(), m_Model.buffers[indexBuffer].data.data(), 0);
     }
 
     // Attribute location -------------
-
-    // A SUPPRIMER
-    const GLint positionAttrLocation = 0;
-    const GLint normalAttrLocation = 1;
-    const GLint texCoordsAttrLocation = 2;
 
     std::map<std::string, GLint> attribIndexOf;
     std::vector<std::string> attribNames = {"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0", "JOINTS_0", "WEIGHTS_0"};
@@ -210,10 +228,7 @@ Application::Application(int argc, char** argv):
 
     // Fill vao ------------------------
 
-    std::vector<GLuint> vaos;
-    std::vector<tinygltf::Primitive> primitives; // Pour chaque VAO on stocke les données de la primitive associée pour le rendu
-
-    for (auto mesh : model.meshes) {
+    for (auto mesh : m_Model.meshes) {
 
       for (auto primitive : mesh.primitives) {
 
@@ -221,25 +236,33 @@ Application::Application(int argc, char** argv):
         glGenVertexArrays(1, &vaoId);
         glBindVertexArray(vaoId);
 
-        tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
-        tinygltf::BufferView bufferView = model.bufferViews[indexAccessor.bufferView];
+        tinygltf::Accessor indexAccessor = m_Model.accessors[primitive.indices];
+        tinygltf::BufferView bufferView = m_Model.bufferViews[indexAccessor.bufferView];
         int bufferIndex = bufferView.buffer;
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[bufferIndex]); // Bind le buffer OpenGL de la premiere boucle
 
         for (auto attribute : primitive.attributes) {
 
-          char key[] = "POSITION";
-          tinygltf::Accessor attributeAccessor = model.accessors[primitive.attributes[key]];
-          tinygltf::BufferView attributeBufferView = model.bufferViews[attributeAccessor.bufferView];
-          int attributeBufferIndex = attributeBufferView.buffer;
+          for (auto key : attribNames) {
 
-          glBindBuffer(GL_ARRAY_BUFFER, buffers[attributeBufferIndex]);
-          glEnableVertexAttribArray(attribIndexOf[key]); // Position
-          int numberOfComponent = tinygltf::GetTypeSizeInBytes(attributeAccessor.type);
-          glVertexAttribPointer(attribIndexOf[key], numberOfComponent, attributeAccessor.componentType, attributeAccessor.normalized, attributeBufferView.byteStride,
-                                (const GLvoid *) (bufferView.byteOffset + attributeAccessor.byteOffset));
+            if (primitive.attributes[key]) {
+              tinygltf::Accessor attributeAccessor = m_Model.accessors[primitive.attributes[key]];
+              tinygltf::BufferView attributeBufferView = m_Model.bufferViews[attributeAccessor.bufferView];
+              int attributeBufferIndex = attributeBufferView.buffer;
+
+              glBindBuffer(GL_ARRAY_BUFFER, buffers[attributeBufferIndex]);
+              glEnableVertexAttribArray(attribIndexOf[key]); // Position
+              int numberOfComponent = tinygltf::GetTypeSizeInBytes(attributeAccessor.type);
+              glVertexAttribPointer(attribIndexOf[key], numberOfComponent, attributeAccessor.componentType, attributeAccessor.normalized, attributeBufferView.byteStride,
+                                    (const GLvoid *) (bufferView.byteOffset + attributeAccessor.byteOffset));
+            }
+
+          }
 
         }
+
+        m_VAOs.push_back(vaoId);
+        m_Primitives.push_back(primitive);
 
       }
 
@@ -249,7 +272,9 @@ Application::Application(int argc, char** argv):
 
     const GLint vboBindingIndex = 0; // Arbitrary choice between 0 and glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS)
 
-
+    const GLint positionAttrLocation = 0;
+    const GLint normalAttrLocation = 1;
+    const GLint texCoordsAttrLocation = 2;
 
     glGenBuffers(1, &m_cubeVBO);
     glGenBuffers(1, &m_cubeIBO);
