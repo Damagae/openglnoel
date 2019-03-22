@@ -78,8 +78,9 @@ int Application::run()
         // }
 
         {
-          const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0)), glm::vec3(0.02f, 0.02f, 0.02f));
-          // modelMatrix = glm::scale(modelMatrix, glm::vec3(0.5f, 0.5f, 0.5f));
+          const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f /** float(seconds)*/, glm::vec3(0, 1, 0)), glm::vec3(0.02f, 0.02f, 0.02f));
+          // const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f /** float(seconds)*/, glm::vec3(0, 1, 0)), glm::vec3(100, 100, 100));
+          // const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
 
           const auto mvMatrix = viewMatrix * modelMatrix;
           const auto mvpMatrix = projMatrix * mvMatrix;
@@ -91,6 +92,7 @@ int Application::run()
 
           glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_ModelKd));
 
+          glBindTexture(GL_TEXTURE_2D, m_cubeTextureKd);
 
           for (uint vaoIndex = 0; vaoIndex < m_VAOs.size(); ++vaoIndex) {
             auto vao = m_VAOs[vaoIndex];
@@ -218,6 +220,8 @@ Application::Application(int argc, char** argv):
       glBufferStorage(GL_ARRAY_BUFFER, m_Model.buffers[indexBuffer].data.size(), m_Model.buffers[indexBuffer].data.data(), 0);
     }
 
+    std::cout << "Nombre de buffers = " << m_Model.buffers.size() << std::endl;
+
     // Attribute location -------------
 
     std::map<std::string, GLint> attribIndexOf;
@@ -239,22 +243,30 @@ Application::Application(int argc, char** argv):
         tinygltf::Accessor indexAccessor = m_Model.accessors[primitive.indices];
         tinygltf::BufferView bufferView = m_Model.bufferViews[indexAccessor.bufferView];
         int bufferIndex = bufferView.buffer;
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[bufferIndex]); // Bind le buffer OpenGL de la premiere boucle
+        glBindBuffer(bufferView.target, buffers[bufferIndex]); // Bind le buffer OpenGL de la premiere boucle
+
+        int indice = 0;
 
         for (auto attribute : primitive.attributes) {
 
           for (auto key : attribNames) {
+          // char key[] = "POSITION";
 
             if (primitive.attributes[key]) {
+              std::cout << "key = " << key << std::endl;
+
               tinygltf::Accessor attributeAccessor = m_Model.accessors[primitive.attributes[key]];
               tinygltf::BufferView attributeBufferView = m_Model.bufferViews[attributeAccessor.bufferView];
               int attributeBufferIndex = attributeBufferView.buffer;
 
-              glBindBuffer(GL_ARRAY_BUFFER, buffers[attributeBufferIndex]);
+
+              glBindBuffer(attributeBufferView.target, buffers[attributeBufferIndex]);
               glEnableVertexAttribArray(attribIndexOf[key]); // Position
               int numberOfComponent = tinygltf::GetTypeSizeInBytes(attributeAccessor.type);
-              glVertexAttribPointer(attribIndexOf[key], numberOfComponent, attributeAccessor.componentType, attributeAccessor.normalized, attributeBufferView.byteStride,
-                                    (const GLvoid *) (bufferView.byteOffset + attributeAccessor.byteOffset));
+              auto offset = bufferView.byteOffset + attributeAccessor.byteOffset;
+              glVertexAttribPointer(attribIndexOf[key], numberOfComponent, attributeAccessor.componentType, attributeAccessor.normalized, attributeBufferView.byteStride, (const GLvoid *) (bufferView.byteOffset + attributeAccessor.byteOffset));
+              glBindBuffer(attributeBufferView.target, 0); // We can unbind the VBO because OpenGL has "written" in the VAO what VBO it needs to read when the VAO will be drawn
+
             }
 
           }
