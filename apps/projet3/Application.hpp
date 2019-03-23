@@ -17,6 +17,9 @@ public:
 
     int run();
 private:
+    tinygltf::Node findNode(tinygltf::Mesh mesh);
+    void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
+
     static glm::vec3 computeDirectionVector(float phiRadians, float thetaRadians)
     {
         const auto cosPhi = glm::cos(phiRadians);
@@ -52,6 +55,7 @@ private:
     const glmlv::fs::path m_AssetsRootPath;
 
     tinygltf::Model m_Model;
+    std::map<int, glm::mat4> m_ModelMatrices;
 
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;

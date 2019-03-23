@@ -78,31 +78,43 @@ int Application::run()
         // }
 
         {
-          const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f /** float(seconds)*/, glm::vec3(0, 1, 0)), glm::vec3(0.02f, 0.02f, 0.02f));
+          // const auto modelMatrix = glm::scale(
+					// 															glm::rotate(
+					// 																	glm::translate(
+					// 																			glm::mat4(1), glm::vec3(2, 0, 0)),
+					// 																	0.2f /** float(seconds)*/, glm::vec3(0, 1, 0)), glm::vec3(0.02f, 0.02f, 0.02f));
           // const auto modelMatrix = glm::scale(glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f /** float(seconds)*/, glm::vec3(0, 1, 0)), glm::vec3(100, 100, 100));
           // const auto modelMatrix = glm::rotate(glm::translate(glm::mat4(1), glm::vec3(2, 0, 0)), 0.2f * float(seconds), glm::vec3(0, 1, 0));
-
-          const auto mvMatrix = viewMatrix * modelMatrix;
-          const auto mvpMatrix = projMatrix * mvMatrix;
-          const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
-
-          glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-          glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
-          glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 
           glUniform3fv(m_uKdLocation, 1, glm::value_ptr(m_ModelKd));
 
           glBindTexture(GL_TEXTURE_2D, m_cubeTextureKd);
 
           for (uint vaoIndex = 0; vaoIndex < m_VAOs.size(); ++vaoIndex) {
-            auto vao = m_VAOs[vaoIndex];
-            auto primitive = m_Primitives[vaoIndex];
+
+						auto vao = m_VAOs[vaoIndex];
+            tinygltf::Primitive primitive = m_Primitives[vaoIndex];
+
+						auto modelMatrix = m_ModelMatrices[vaoIndex];
+
+						const auto mvMatrix = viewMatrix * modelMatrix;
+	          const auto mvpMatrix = projMatrix * mvMatrix;
+	          const auto normalMatrix = glm::transpose(glm::inverse(mvMatrix));
+
+	          glUniformMatrix4fv(m_uModelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+	          glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
+	          glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+
+
             glBindVertexArray(vao);
-            tinygltf::Accessor accessor = m_Model.accessors[primitive.indices];
+            tinygltf::Accessor indices = m_Model.accessors[primitive.indices];
 
             int mode = getMode(primitive.mode);
 
-            glDrawElements(mode, accessor.count, accessor.componentType, (const void*) accessor.byteOffset);
+						mode = GL_PATCHES;
+
+            glDrawElements(mode, indices.count, indices.componentType, (const void*) indices.byteOffset);
           }
         }
 
@@ -210,6 +222,35 @@ Application::Application(int argc, char** argv):
       exit(-1);
     }
 
+		// Infos ---------------------
+
+		std::cout << "# of animations   : " << m_Model.animations.size() << std::endl;
+		std::cout << "# of buffers      : " << m_Model.buffers.size() << std::endl;
+		std::cout << "# of bufferViews  : " << m_Model.bufferViews.size() << std::endl;
+		std::cout << "# of materials    : " << m_Model.materials.size() << std::endl;
+		std::cout << "# of meshes       : " << m_Model.meshes.size() << std::endl;
+		std::cout << "# of nodes        : " << m_Model.nodes.size() << std::endl;
+		std::cout << "# of textures     : " << m_Model.textures.size() << std::endl;
+		std::cout << "# of images       : " << m_Model.images.size() << std::endl;
+		std::cout << "# of scenes       : " << m_Model.scenes.size() << std::endl;
+
+		// Node matrix computing
+		// Il faut calculer les nodes, selon leur parent
+		// La modelMatrix et les transformation d'un node dépendent des nodes parents
+		// Il faut stocker les transformation "global" dans un dictionnaire (index du mesh, node)
+
+		for (auto node : m_Model.nodes) {
+			std::cout << "***" << std::endl;
+			std::cout << "name             : " << node.name << std::endl;
+			std::cout << "skin             : " << node.skin << std::endl;
+			std::cout << "mesh             : " << node.mesh << std::endl;
+			std::cout << "children size    : " << node.children.size() << std::endl;
+			std::cout << "rotation size    : " << node.rotation.size() << std::endl;
+			std::cout << "scale size       : " << node.scale.size() << std::endl;
+			std::cout << "translation size : " << node.translation.size() << std::endl;
+			std::cout << "matrix size      : " << node.matrix.size() << std::endl;
+		}
+
     // Fill buffers ----------------------
 
     std::vector<GLuint> buffers(m_Model.buffers.size());
@@ -220,7 +261,7 @@ Application::Application(int argc, char** argv):
       glBufferStorage(GL_ARRAY_BUFFER, m_Model.buffers[indexBuffer].data.size(), m_Model.buffers[indexBuffer].data.data(), 0);
     }
 
-    std::cout << "Nombre de buffers = " << m_Model.buffers.size() << std::endl;
+    std::cout << "Nombre de buffers : " << m_Model.buffers.size() << std::endl;
 
     // Attribute location -------------
 
@@ -231,7 +272,7 @@ Application::Application(int argc, char** argv):
     }
 
     // Fill vao ------------------------
-
+		int meshcount = 0;
     for (auto mesh : m_Model.meshes) {
 
       for (auto primitive : mesh.primitives) {
@@ -240,30 +281,24 @@ Application::Application(int argc, char** argv):
         glGenVertexArrays(1, &vaoId);
         glBindVertexArray(vaoId);
 
-        tinygltf::Accessor indexAccessor = m_Model.accessors[primitive.indices];
-        tinygltf::BufferView bufferView = m_Model.bufferViews[indexAccessor.bufferView];
+        tinygltf::Accessor indicesAccessor = m_Model.accessors[primitive.indices];
+        tinygltf::BufferView bufferView = m_Model.bufferViews[indicesAccessor.bufferView];
         int bufferIndex = bufferView.buffer;
         glBindBuffer(bufferView.target, buffers[bufferIndex]); // Bind le buffer OpenGL de la premiere boucle
-
-        int indice = 0;
 
         for (auto attribute : primitive.attributes) {
 
           for (auto key : attribNames) {
-          // char key[] = "POSITION";
 
             if (primitive.attributes[key]) {
-              std::cout << "key = " << key << std::endl;
 
               tinygltf::Accessor attributeAccessor = m_Model.accessors[primitive.attributes[key]];
               tinygltf::BufferView attributeBufferView = m_Model.bufferViews[attributeAccessor.bufferView];
               int attributeBufferIndex = attributeBufferView.buffer;
 
-
               glBindBuffer(attributeBufferView.target, buffers[attributeBufferIndex]);
-              glEnableVertexAttribArray(attribIndexOf[key]); // Position
+              glEnableVertexAttribArray(attribIndexOf[key]);
               int numberOfComponent = tinygltf::GetTypeSizeInBytes(attributeAccessor.type);
-              auto offset = bufferView.byteOffset + attributeAccessor.byteOffset;
               glVertexAttribPointer(attribIndexOf[key], numberOfComponent, attributeAccessor.componentType, attributeAccessor.normalized, attributeBufferView.byteStride, (const GLvoid *) (bufferView.byteOffset + attributeAccessor.byteOffset));
               glBindBuffer(attributeBufferView.target, 0); // We can unbind the VBO because OpenGL has "written" in the VAO what VBO it needs to read when the VAO will be drawn
 
@@ -279,6 +314,8 @@ Application::Application(int argc, char** argv):
       }
 
     }
+
+		computeMatrices(m_Model.nodes[0], glm::mat4(1));
 
     // ------------------------------------------------------------------------------------------------------------
 
@@ -383,4 +420,53 @@ Application::Application(int argc, char** argv):
     m_uKdSamplerLocation = glGetUniformLocation(m_program.glId(), "uKdSampler");
 
     m_viewController.setViewMatrix(glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
+}
+
+tinygltf::Node Application::findNode(tinygltf::Mesh mesh) {
+		for (auto node : m_Model.nodes) {
+			if (m_Model.meshes[node.mesh] == mesh) {
+				return node;
+			}
+		}
+		return m_Model.nodes[0];
+}
+
+void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
+
+	// Default
+	glm::mat4 modelMatrix = glm::mat4(1);
+
+	if (node.matrix.size() == 16) {
+		modelMatrix = glm::mat4(node.matrix[0], node.matrix[1], node.matrix[2], node.matrix[3], node.matrix[4], node.matrix[5], node.matrix[6], node.matrix[7], node.matrix[8], node.matrix[9], node.matrix[10], node.matrix[11], node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15]);
+	}
+
+	if (node.translation.size() == 3) {
+		const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+		modelMatrix = glm::translate(modelMatrix, translation);
+	}
+
+	if (node.rotation.size() == 3) {
+		 const auto rotation = node.rotation.size() == 3 ? glm::vec3(node.rotation[0], node.rotation[1], node.rotation[2]) : glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+		 // modelMatrix = glm::rotate(modelMatrix, ):
+	}
+
+	if (node.rotation.size() == 4) {
+		//
+	}
+
+	if (node.scale.size() == 3) {
+		 const auto scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+		 modelMatrix = glm::scale(modelMatrix, scale);
+	}
+
+	modelMatrix = modelMatrix * matrix;
+
+	if (node.mesh > 0) {
+		m_ModelMatrices[node.mesh] = modelMatrix;
+	}
+
+	for (auto child : node.children) {
+		computeMatrices(m_Model.nodes[child], modelMatrix);
+	}
+
 }
