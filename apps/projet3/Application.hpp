@@ -17,8 +17,40 @@ public:
 
     int run();
 private:
-    tinygltf::Node findNode(tinygltf::Mesh mesh);
     void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
+
+    static glm::mat4 quatToMatrix(glm::vec4 q) {
+      float sqw = q.w * q.w;
+      float sqx = q.x * q.x;
+      float sqy = q.y * q.y;
+      float sqz = q.z * q.z;
+
+      // invs (inverse square length) is only required if quaternion is not already normalised
+      float invs = 1 / (sqx + sqy + sqz + sqw);
+      float m00 = ( sqx - sqy - sqz + sqw)*invs ; // since sqw + sqx + sqy + sqz =1/invs*invs
+      float m11 = (-sqx + sqy - sqz + sqw)*invs ;
+      float m22 = (-sqx - sqy + sqz + sqw)*invs ;
+
+      float tmp1 = q.x*q.y;
+      float tmp2 = q.z*q.w;
+      float m10 = 2.0 * (tmp1 + tmp2)*invs ;
+      float m01 = 2.0 * (tmp1 - tmp2)*invs ;
+
+      tmp1 = q.x*q.z;
+      tmp2 = q.y*q.w;
+      float m20 = 2.0 * (tmp1 - tmp2)*invs ;
+      float m02 = 2.0 * (tmp1 + tmp2)*invs ;
+      tmp1 = q.y*q.z;
+      tmp2 = q.x*q.w;
+      float m21 = 2.0 * (tmp1 + tmp2)*invs ;
+      float m12 = 2.0 * (tmp1 - tmp2)*invs ;
+
+      return glm::mat4( m00, m01, m02, 0,
+                        m10, m11, m12, 0,
+                        m20, m21, m22, 0,
+                        0,   0,   0,   1 );
+}
+
 
     static glm::vec3 computeDirectionVector(float phiRadians, float thetaRadians)
     {
@@ -56,6 +88,7 @@ private:
 
     tinygltf::Model m_Model;
     std::map<int, glm::mat4> m_ModelMatrices;
+    std::vector<int> m_MeshIds;
 
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;

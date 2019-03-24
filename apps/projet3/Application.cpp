@@ -13,7 +13,7 @@
 
 int Application::run()
 {
-	float clearColor[3] = { 0.5, 0.8, 0.2 };
+	float clearColor[3] = { 0.9, 0.9, 0.8 };
 	glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
 
     // Loop until the user closes the window
@@ -77,6 +77,7 @@ int Application::run()
         //     glDrawElements(GL_TRIANGLES, m_sphereGeometry.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
         // }
 
+
         {
           // const auto modelMatrix = glm::scale(
 					// 															glm::rotate(
@@ -92,10 +93,14 @@ int Application::run()
 
           for (uint vaoIndex = 0; vaoIndex < m_VAOs.size(); ++vaoIndex) {
 
+						// std::cout << "hey" << std::endl;
+
+
 						auto vao = m_VAOs[vaoIndex];
             tinygltf::Primitive primitive = m_Primitives[vaoIndex];
 
-						auto modelMatrix = m_ModelMatrices[vaoIndex];
+						const auto modelMatrix = m_ModelMatrices[vaoIndex + 1];
+						// auto modelMatrix = glm::mat4(0);
 
 						const auto mvMatrix = viewMatrix * modelMatrix;
 	          const auto mvpMatrix = projMatrix * mvMatrix;
@@ -105,18 +110,18 @@ int Application::run()
 	          glUniformMatrix4fv(m_uModelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
 	          glUniformMatrix4fv(m_uNormalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 
-
-
             glBindVertexArray(vao);
             tinygltf::Accessor indices = m_Model.accessors[primitive.indices];
 
             int mode = getMode(primitive.mode);
 
-						mode = GL_PATCHES;
+						// mode = GL_PATCHES;
 
             glDrawElements(mode, indices.count, indices.componentType, (const void*) indices.byteOffset);
           }
         }
+
+				exit(0);
 
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindSampler(0, 0); // Unbind the sampler
@@ -234,22 +239,18 @@ Application::Application(int argc, char** argv):
 		std::cout << "# of images       : " << m_Model.images.size() << std::endl;
 		std::cout << "# of scenes       : " << m_Model.scenes.size() << std::endl;
 
-		// Node matrix computing
-		// Il faut calculer les nodes, selon leur parent
-		// La modelMatrix et les transformation d'un node dépendent des nodes parents
-		// Il faut stocker les transformation "global" dans un dictionnaire (index du mesh, node)
 
-		for (auto node : m_Model.nodes) {
-			std::cout << "***" << std::endl;
-			std::cout << "name             : " << node.name << std::endl;
-			std::cout << "skin             : " << node.skin << std::endl;
-			std::cout << "mesh             : " << node.mesh << std::endl;
-			std::cout << "children size    : " << node.children.size() << std::endl;
-			std::cout << "rotation size    : " << node.rotation.size() << std::endl;
-			std::cout << "scale size       : " << node.scale.size() << std::endl;
-			std::cout << "translation size : " << node.translation.size() << std::endl;
-			std::cout << "matrix size      : " << node.matrix.size() << std::endl;
-		}
+		// for (auto node : m_Model.nodes) {
+		// 	std::cout << "***" << std::endl;
+		// 	std::cout << "name             : " << node.name << std::endl;
+		// 	std::cout << "skin             : " << node.skin << std::endl;
+		// 	std::cout << "mesh             : " << node.mesh << std::endl;
+		// 	std::cout << "children size    : " << node.children.size() << std::endl;
+		// 	std::cout << "rotation size    : " << node.rotation.size() << std::endl;
+		// 	std::cout << "scale size       : " << node.scale.size() << std::endl;
+		// 	std::cout << "translation size : " << node.translation.size() << std::endl;
+		// 	std::cout << "matrix size      : " << node.matrix.size() << std::endl;
+		// }
 
     // Fill buffers ----------------------
 
@@ -313,9 +314,19 @@ Application::Application(int argc, char** argv):
 
       }
 
+			m_MeshIds.push_back(meshcount++);
+
     }
 
+		std::cout << "vao " << m_VAOs.size() << std::endl;
+
 		computeMatrices(m_Model.nodes[0], glm::mat4(1));
+		std::cout << "# of matrices : " << m_ModelMatrices.size() << std::endl;
+
+		// for (auto matrice : m_ModelMatrices) {
+		// 	std::cout << "Matrice mesh " << matrice.first << std::endl;
+		// 	std::cout << matrice.second << std::endl;
+		// }
 
     // ------------------------------------------------------------------------------------------------------------
 
@@ -422,46 +433,40 @@ Application::Application(int argc, char** argv):
     m_viewController.setViewMatrix(glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
 }
 
-tinygltf::Node Application::findNode(tinygltf::Mesh mesh) {
-		for (auto node : m_Model.nodes) {
-			if (m_Model.meshes[node.mesh] == mesh) {
-				return node;
-			}
-		}
-		return m_Model.nodes[0];
-}
-
 void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
 
 	// Default
-	glm::mat4 modelMatrix = glm::mat4(1);
+	glm::mat4 modelMatrix = matrix;
 
 	if (node.matrix.size() == 16) {
 		modelMatrix = glm::mat4(node.matrix[0], node.matrix[1], node.matrix[2], node.matrix[3], node.matrix[4], node.matrix[5], node.matrix[6], node.matrix[7], node.matrix[8], node.matrix[9], node.matrix[10], node.matrix[11], node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15]);
 	}
 
-	if (node.translation.size() == 3) {
-		const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
-		modelMatrix = glm::translate(modelMatrix, translation);
+	else {
+
+		if (node.scale.size() == 3) {
+			 const auto scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+			 modelMatrix = glm::scale(modelMatrix, scale);
+		}
+
+		if (node.rotation.size() == 4) {
+			const auto rotation = quatToMatrix(glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]));
+			modelMatrix = rotation * modelMatrix;
+		}
+
+		if (node.translation.size() == 3) {
+			const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+			modelMatrix = glm::translate(modelMatrix, translation);
+		}
 	}
 
-	if (node.rotation.size() == 3) {
-		 const auto rotation = node.rotation.size() == 3 ? glm::vec3(node.rotation[0], node.rotation[1], node.rotation[2]) : glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-		 // modelMatrix = glm::rotate(modelMatrix, ):
-	}
 
-	if (node.rotation.size() == 4) {
-		//
-	}
-
-	if (node.scale.size() == 3) {
-		 const auto scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
-		 modelMatrix = glm::scale(modelMatrix, scale);
-	}
 
 	modelMatrix = modelMatrix * matrix;
 
-	if (node.mesh > 0) {
+	if (node.mesh > -1) {
+		// std::cout << "Registration of mesh #" << node.mesh << std::endl;
+		// std::cout << modelMatrix << std::endl;
 		m_ModelMatrices[node.mesh] = modelMatrix;
 	}
 
