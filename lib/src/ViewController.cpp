@@ -4,10 +4,10 @@
 
 using namespace glm;
 
-namespace glmlv 
+namespace glmlv
 {
 
-bool ViewController::update(float elapsedTime) 
+bool ViewController::update(float elapsedTime)
 {
 
     auto frontVector = -vec3(m_RcpViewMatrix[2]);

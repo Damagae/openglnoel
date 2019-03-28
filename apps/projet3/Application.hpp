@@ -10,6 +10,8 @@
 
 #include <tiny_gltf.h>
 
+#include "Controller.hpp"
+
 class Application
 {
 public:
@@ -49,7 +51,7 @@ private:
                         m10, m11, m12, 0,
                         m20, m21, m22, 0,
                         0,   0,   0,   1 );
-}
+    }
 
 
     static glm::vec3 computeDirectionVector(float phiRadians, float thetaRadians)
@@ -89,6 +91,8 @@ private:
     tinygltf::Model m_Model;
     std::map<int, glm::mat4> m_ModelMatrices;
     std::vector<int> m_MeshIds;
+    std::vector<GLuint> m_TextureIds;
+    std::vector<GLuint> m_SamplersIds;
 
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;
@@ -110,7 +114,8 @@ private:
 
     glmlv::GLProgram m_program;
 
-    glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
+    // glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
+    Controller m_Controller{ m_GLFWHandle.window(), 3.f };
     GLint m_uModelViewProjMatrixLocation;
     GLint m_uModelViewMatrixLocation;
     GLint m_uNormalMatrixLocation;
