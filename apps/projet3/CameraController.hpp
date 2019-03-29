@@ -23,6 +23,7 @@ class CameraController {
   	float m_fAngleY = 0.f;		// Angle effectuée par la caméra autour de l'axe Y de la scène
 
     glm::dvec2 m_PreviousDelta;
+    glm::dvec2 m_Delta;
 
   	// Returns true if zoom is max/min, false if not
     bool zoomMin(float delta) {

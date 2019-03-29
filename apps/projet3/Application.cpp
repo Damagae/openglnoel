@@ -64,8 +64,8 @@ int Application::run()
 
 						tinygltf::Material material = m_Model.materials[primitive.material];
 
-						const auto modelMatrix = glm::scale(m_ModelMatrices[id], glm::vec3(0.02f, 0.02f, 0.02f));
-						// const auto modelMatrix = glm::mat4(1);
+						const auto matrix = m_ModelMatrices[id];
+						const auto modelMatrix = scaleModel(matrix);
 
 						const auto mvMatrix = viewMatrix * modelMatrix;
 	          const auto mvpMatrix = projMatrix * mvMatrix;
@@ -295,6 +295,7 @@ Application::Application(int argc, char** argv):
 		std::cout << "# of vaos : " << m_VAOs.size() << std::endl;
 
 		computeMatrices(m_Model.nodes[0], glm::mat4(1));
+		computeScaling();
 		std::cout << "# of matrices : " << m_ModelMatrices.size() << std::endl;
 
 		// Textures ------------------------

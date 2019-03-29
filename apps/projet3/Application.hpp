@@ -21,6 +21,51 @@ public:
 private:
     void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
 
+    glm::mat4 scaleModel(glm::mat4 matrix) {
+      return glm::scale(matrix, m_ModelScaling);
+    }
+
+    void computeScaling() {
+      float maxScale = 1.f;
+      float scaleFactor = 1;
+      // Scaling
+      for (auto element : m_ModelMatrices) {
+        auto matrix = element.second;
+        if (matrix[0][0] > maxScale) {
+          maxScale = matrix[0][0];
+        }
+        else if (matrix[1][1] > maxScale) {
+          maxScale = matrix[1][1];
+        }
+        else if (matrix[2][2] > maxScale) {
+          maxScale = matrix[2][2];
+        }
+      }
+
+      scaleFactor = 1.f / maxScale;
+
+      float maxTranslation = 50.f;
+      // Translation
+      for (auto element : m_ModelMatrices) {
+        auto matrix = element.second;
+        if (matrix[0][3] > maxTranslation) {
+          maxTranslation = matrix[0][0];
+        }
+        else if (matrix[1][3] > maxTranslation) {
+          maxTranslation = matrix[1][1];
+        }
+        else if (matrix[2][3] > maxTranslation) {
+          maxTranslation = matrix[2][2];
+        }
+      }
+
+      if (1.f / maxTranslation < scaleFactor) {
+        scaleFactor = 1.f / maxTranslation;
+      }
+
+      m_ModelScaling = glm::vec3(scaleFactor, scaleFactor, scaleFactor);
+    }
+
     static glm::mat4 quatToMatrix(glm::vec4 q) {
       float sqw = q.w * q.w;
       float sqx = q.x * q.x;
@@ -96,6 +141,8 @@ private:
 
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;
+
+    glm::vec3 m_ModelScaling = glm::vec3(1,1,1);
 
     glmlv::SimpleGeometry m_cubeGeometry;
     glmlv::SimpleGeometry m_sphereGeometry;

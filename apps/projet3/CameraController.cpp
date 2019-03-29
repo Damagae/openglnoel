@@ -1,4 +1,5 @@
 #include "CameraController.hpp"
+#include <iostream>
 
 using namespace glm;
 
@@ -35,8 +36,6 @@ bool CameraController::update(float elapsedTime)
         dvec2 cursorPosition;
         glfwGetCursorPos(m_pWindow, &cursorPosition.x, &cursorPosition.y);
         dvec2 delta = cursorPosition - m_LastCursorPosition;
-        delta.x += m_PreviousDelta.x / 1.5;
-        delta.y += m_PreviousDelta.y / 1.5;
 
         m_LastCursorPosition = cursorPosition;
 
@@ -47,8 +46,10 @@ bool CameraController::update(float elapsedTime)
             hasMoved = true;
         }
 
-        m_PreviousDelta = delta;
     }
+
+
+
 
     return hasMoved;
 }
