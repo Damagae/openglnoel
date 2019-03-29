@@ -115,7 +115,7 @@ private:
     glmlv::GLProgram m_program;
 
     // glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
-    Controller m_Controller{ m_GLFWHandle.window(), 3.f };
+    Controller m_Controller{ m_GLFWHandle.window(), 0.008f };
     GLint m_uModelViewProjMatrixLocation;
     GLint m_uModelViewMatrixLocation;
     GLint m_uNormalMatrixLocation;

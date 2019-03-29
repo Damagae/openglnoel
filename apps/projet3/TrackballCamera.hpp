@@ -21,7 +21,7 @@ public:
 	glm::mat4 getViewMatrix(glm::mat4) const; // calcule la ViewMatrix de la caméra
 
 private:
-	float m_fDistance;		// Distance par rapport au centre de la scène
+	float m_fDistance;	// Distance par rapport au centre de la scène
 	float m_fHauteur;		// Hauteur de la caméra par rapport au centre de la scène
 	float m_fAngleX;		// Angle effectuée par la caméra autour de l'axe X de la scène
 	float m_fAngleY;		// Angle effectuée par la caméra autour de l'axe Y de la scène
