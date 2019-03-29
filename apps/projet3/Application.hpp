@@ -6,6 +6,12 @@
 #include <glmlv/ViewController.hpp>
 #include <glmlv/simple_geometry.hpp>
 
+#include <iostream>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/io.hpp>
+
 #include <glm/glm.hpp>
 
 #include <tiny_gltf.h>
@@ -29,39 +35,45 @@ private:
     void computeScaling() {
       float maxScale = 1.f;
       float scaleFactor = 1;
-      // Scaling
-      for (auto element : m_ModelMatrices) {
-        auto matrix = element.second;
-        if (matrix[0][0] > maxScale) {
-          maxScale = matrix[0][0];
+      float maxTranslation = 1.f;
+
+      for (uint i = 0; i < m_ModelMatrices.size(); ++i) {
+        glm::mat4 matrix = m_ModelMatrices[i];
+
+        // std::cout << matrix << std::endl;
+        // std::cout << "scale : (" << matrix[0][0] << ", " << matrix[1][1] << ", " << matrix[2][2] << ")" << std::endl;
+        // std::cout << "translate : (" << matrix[3][0] << ", " << matrix[3][1] << ", " << matrix[3][2] << ")" << std::endl;
+
+        // Scaling
+        if (glm::abs(matrix[0][0]) > maxScale) {
+          maxScale = glm::abs(matrix[0][0]);
         }
-        else if (matrix[1][1] > maxScale) {
-          maxScale = matrix[1][1];
+        else if (glm::abs(matrix[1][1]) > maxScale) {
+          maxScale = glm::abs(matrix[1][1]);
         }
-        else if (matrix[2][2] > maxScale) {
-          maxScale = matrix[2][2];
+        else if (glm::abs(matrix[2][2]) > maxScale) {
+          maxScale = glm::abs(matrix[2][2]);
+        }
+
+        // Translation
+        if (glm::abs(matrix[3][0]) > maxTranslation) {
+          maxTranslation = glm::abs(matrix[3][0]);
+        }
+        else if (glm::abs(matrix[3][1]) > maxTranslation) {
+          maxTranslation = glm::abs(matrix[3][1]);
+        }
+        else if (glm::abs(matrix[3][2]) > maxTranslation) {
+          maxTranslation = glm::abs(matrix[3][2]);
         }
       }
 
-      scaleFactor = 1.f / maxScale;
+      // std::cout << "max scale : " << maxScale << std::endl;
+      // std::cout << "max translation : " << maxTranslation * 0.1 << std::endl;
 
-      float maxTranslation = 50.f;
-      // Translation
-      for (auto element : m_ModelMatrices) {
-        auto matrix = element.second;
-        if (matrix[0][3] > maxTranslation) {
-          maxTranslation = matrix[0][0];
-        }
-        else if (matrix[1][3] > maxTranslation) {
-          maxTranslation = matrix[1][1];
-        }
-        else if (matrix[2][3] > maxTranslation) {
-          maxTranslation = matrix[2][2];
-        }
-      }
-
-      if (1.f / maxTranslation < scaleFactor) {
-        scaleFactor = 1.f / maxTranslation;
+      if (maxTranslation > maxScale) {
+        scaleFactor = 1.f / (maxTranslation * 0.1);
+      } else {
+        scaleFactor = 1.f / maxScale;
       }
 
       m_ModelScaling = glm::vec3(scaleFactor, scaleFactor, scaleFactor);
@@ -162,6 +174,7 @@ private:
     std::vector<int> m_MeshIds;
     std::vector<GLuint> m_TextureIds;
     std::vector<GLuint> m_SamplersIds;
+    std::vector<tinygltf::Material> m_Materials;
 
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;

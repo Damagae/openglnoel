@@ -12,13 +12,16 @@ class CameraController {
     GLFWwindow* m_pWindow = nullptr;
     float m_fSpeed = 0.f;
     bool m_LeftButtonPressed = false;
-    glm::dvec2 m_LastCursorPosition;
+    bool m_RightButtonPressed = false;
+    glm::dvec2 m_LastCursorPositionLeft;
+    glm::dvec2 m_LastCursorPositionRight;
 
     glm::mat4 m_ViewMatrix = glm::mat4(1);
     glm::mat4 m_RcpViewMatrix = glm::mat4(1);
 
     float m_fDistance = 8.f;	// Distance par rapport au centre de la scène
-  	float m_fHauteur = 2.f;		// Hauteur de la caméra par rapport au centre de la scène
+    float m_fHauteur = 2.f;		// Hauteur de la caméra par rapport au centre de la scène
+  	float m_fDecalage = 0.f;		// Hauteur de la caméra par rapport au centre de la scène
   	float m_fAngleX = 0.f;		// Angle effectuée par la caméra autour de l'axe X de la scène
   	float m_fAngleY = 0.f;		// Angle effectuée par la caméra autour de l'axe Y de la scène
 
@@ -46,6 +49,10 @@ class CameraController {
         scrollOffset += yoffset;
     }
 
+    void setHauteur(float hauteur) {
+      m_fHauteur = hauteur;
+    }
+
     void setSpeed(float speed) { m_fSpeed = speed; }
 
     float getSpeed() const { return m_fSpeed; }
@@ -62,10 +69,10 @@ class CameraController {
 
     glm::mat4& getViewMatrix() {
         // m_ViewMatrix = glm::translate(glm::mat4(1.f), glm::vec3(0.0f, -m_fHauteur, -m_fDistance));
-        m_ViewMatrix = glm::translate(glm::mat4(1.f), glm::vec3(0.f, -m_fHauteur + 2.f, -m_fDistance));
+        m_ViewMatrix = glm::translate(glm::mat4(1.f), glm::vec3(m_fDecalage, -m_fHauteur + m_fHauteur / 2.f, -m_fDistance));
       	m_ViewMatrix = glm::rotate(m_ViewMatrix, m_fAngleX, glm::vec3(0, 1, 0));
       	m_ViewMatrix = glm::rotate(m_ViewMatrix, m_fAngleY, glm::vec3(1, 0, 0));
-        m_ViewMatrix = glm::translate(m_ViewMatrix, glm::vec3(0.f, - 2.f, 0.f));
+        m_ViewMatrix = glm::translate(m_ViewMatrix, glm::vec3(m_fDecalage, - m_fHauteur / 2.f, 0.f));
 
       	return m_ViewMatrix;
     }
@@ -79,6 +86,14 @@ class CameraController {
       if (!zoomMin(delta) && !zoomMax(delta)) {
         m_fDistance += delta;
       }
+    }
+
+    void moveCenterX(float delta) {
+        m_fDecalage += delta;
+    }
+
+    void moveCenterY(float delta) {
+        m_fHauteur += delta;
     }
 
     // Rotate the camera on the X axis

@@ -42,6 +42,7 @@ int Application::run()
 
 							const auto matrix = m_ModelMatrices[id];
 							const auto modelMatrix = scaleModel(matrix);
+							// const auto modelMatrix = matrix;
 
 							const auto mvMatrix = viewMatrix * modelMatrix;
 							const auto mvpMatrix = projMatrix * mvMatrix;
@@ -64,8 +65,30 @@ int Application::run()
 							glUniform1i(m_uShininessSamplerLocation, 3);
 
 							// Diffuse color
-							glUniform3fv(m_uKdLocation, 1, glm::value_ptr(glm::vec3(1, 1, 1)));
-							glBindTexture(GL_TEXTURE_2D, m_TextureIds[material.values["baseColorTexture"].TextureIndex()]);
+							if (material.values.find("baseColorTexture") != material.values.end()) {
+								glActiveTexture(GL_TEXTURE1);
+								auto baseColorFactor = material.values["baseColorTexture"].number_array;
+								if (baseColorFactor.size() >= 3) {
+									glUniform3fv(m_uKdLocation, 1, glm::value_ptr(glm::vec3(baseColorFactor[0], baseColorFactor[1], baseColorFactor[2])));
+								} else {
+									glUniform3fv(m_uKdLocation, 1, glm::value_ptr(glm::vec3(1, 1, 1)));
+								}
+								glBindTexture(GL_TEXTURE_2D, m_TextureIds[material.values["baseColorTexture"].TextureIndex()]);
+							}
+
+
+							// Ambiant Color
+							if (material.values.find("emissiveTexture") != material.values.end()) {
+								glActiveTexture(GL_TEXTURE0);
+								auto emissiveFactor = material.values["emissiveFactor"].number_array;
+								if (emissiveFactor.size() >= 3) {
+									glUniform3fv(m_uKaLocation, 1, glm::value_ptr(glm::vec3(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2])));
+								} else {
+									glUniform3fv(m_uKaLocation, 1, glm::value_ptr(glm::vec3(0, 0, 0)));
+								}
+								glBindTexture(GL_TEXTURE_2D, m_TextureIds[material.values["emissiveTexture"].TextureIndex()]);
+							}
+
 
 							glBindVertexArray(vao);
 							tinygltf::Accessor indices = m_Model.accessors[primitive.indices];
@@ -267,19 +290,8 @@ Application::Application(int argc, char** argv):
 		std::cout << "# of textures     : " << m_Model.textures.size() << std::endl;
 		std::cout << "# of images       : " << m_Model.images.size() << std::endl;
 		std::cout << "# of scenes       : " << m_Model.scenes.size() << std::endl;
+		std::cout << "# of samplers     : " << m_Model.samplers.size() << std::endl;
 
-
-		// for (auto node : m_Model.nodes) {
-		// 	std::cout << "***" << std::endl;
-		// 	std::cout << "name             : " << node.name << std::endl;
-		// 	std::cout << "skin             : " << node.skin << std::endl;
-		// 	std::cout << "mesh             : " << node.mesh << std::endl;
-		// 	std::cout << "children size    : " << node.children.size() << std::endl;
-		// 	std::cout << "rotation size    : " << node.rotation.size() << std::endl;
-		// 	std::cout << "scale size       : " << node.scale.size() << std::endl;
-		// 	std::cout << "translation size : " << node.translation.size() << std::endl;
-		// 	std::cout << "matrix size      : " << node.matrix.size() << std::endl;
-		// }
 
     // Fill buffers ----------------------
 
@@ -292,8 +304,6 @@ Application::Application(int argc, char** argv):
       glBufferStorage(GL_ARRAY_BUFFER, m_Model.buffers[buffer].data.size(), m_Model.buffers[buffer].data.data(), 0);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-
-    std::cout << "# of buffers : " << buffers.size() << std::endl;
 
     // Attribute location -------------
 
@@ -355,49 +365,57 @@ Application::Application(int argc, char** argv):
 		computeScaling();
 		std::cout << "# of matrices : " << m_ModelMatrices.size() << std::endl;
 
+		m_CameraController.setHauteur(10 / 2);
+
+
+		// Samplers -----------------------
+		// Samplers ------------------------
+
+		for (tinygltf::Sampler sampler : m_Model.samplers) {
+			GLuint samplerId;
+			glGenSamplers(1, &samplerId);
+			glSamplerParameteri(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
+			glSamplerParameteri(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
+			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_S, sampler.wrapS);
+			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_T, sampler.wrapT);
+			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_R, sampler.wrapR);
+
+			m_SamplersIds.push_back(samplerId);
+		}
+
+		if (m_SamplersIds.size() > 0) {
+			m_textureSampler = m_SamplersIds[0];
+		}
+
 		// Textures ------------------------
 
 		for (tinygltf::Texture texture : m_Model.textures) {
 
-			glActiveTexture(GL_TEXTURE0);
-
 			tinygltf::Image &image = m_Model.images[texture.source];
 
-			GLuint texId;
+			std::cout << "loading texture : " << image.uri << std::endl;
+
+			GLuint texId = 0;
       glGenTextures(1, &texId);
+			// glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
       glBindTexture(GL_TEXTURE_2D, texId);
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-			GLenum format = GL_RGBA;
-			if (image.component == 3) {
-					format = GL_RGB;
-			}
+			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
+			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
+			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, sampler.wrapS);
+			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, sampler.wrapT);
+			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, sampler.wrapR);
 
+			GLenum format = image.component == 3 ? GL_RGB : GL_RGBA;
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, image.width, image.height);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, format, GL_UNSIGNED_BYTE, &image.image.at(0));
+			// glTexImage2D(GL_TEXTURE_2D, 0, format, image.width, image.height, 0, format, GL_UNSIGNED_BYTE, &image.image.at(0));
+
       glBindTexture(GL_TEXTURE_2D, 0);
 
 			m_TextureIds.push_back(texId);
 
-			// Samplers ------------------------
-
-			tinygltf::Sampler sampler = m_Model.samplers[texture.sampler];
-
-			GLuint samplerId;
-			glGenSamplers(1, &samplerId);
-	    glSamplerParameteri(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
-			glSamplerParameteri(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
-			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_S, sampler.wrapS);
-			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_T, sampler.wrapT);
-	    glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_R, sampler.wrapR);
-
-			m_SamplersIds.push_back(samplerId);
-
 		}
-
-		std::cout << "# of samplers : " << m_SamplersIds.size() << std::endl;
 
 		initShadersData();
 
