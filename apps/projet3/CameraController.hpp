@@ -5,7 +5,7 @@
 
 struct GLFWwindow;
 
-class Controller {
+class CameraController {
 
   private:
     GLFWwindow* m_pWindow = nullptr;
@@ -32,7 +32,7 @@ class Controller {
 
 
   public:
-    Controller(GLFWwindow* window, float speed = 1.f) :
+    CameraController(GLFWwindow* window, float speed = 1.f) :
         m_pWindow(window), m_fSpeed(speed) { }
 
     void setSpeed(float speed) { m_fSpeed = speed; }

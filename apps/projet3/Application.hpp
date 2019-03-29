@@ -10,7 +10,7 @@
 
 #include <tiny_gltf.h>
 
-#include "Controller.hpp"
+#include "CameraController.hpp"
 
 class Application
 {
@@ -115,7 +115,7 @@ private:
     glmlv::GLProgram m_program;
 
     // glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
-    Controller m_Controller{ m_GLFWHandle.window(), 0.008f };
+    CameraController m_CameraController{ m_GLFWHandle.window(), 0.008f };
     GLint m_uModelViewProjMatrixLocation;
     GLint m_uModelViewMatrixLocation;
     GLint m_uNormalMatrixLocation;

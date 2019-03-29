@@ -1,10 +1,10 @@
-#include "Controller.hpp"
+#include "CameraController.hpp"
 
 #include <glmlv/glfw.hpp>
 
 using namespace glm;
 
-bool Controller::update(float elapsedTime)
+bool CameraController::update(float elapsedTime)
 {
 
     bool hasMoved = false;
