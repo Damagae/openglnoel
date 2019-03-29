@@ -163,6 +163,35 @@ private:
     GLuint m_TriangleVBO = 0;
     GLuint m_TriangleVAO = 0;
 
+    const glm::vec3 dielectricSpecular = glm::vec3(0.04, 0.04, 0.04);
+    const glm::vec3 black = glm::vec3(0, 0, 0);
+
+    const glm::vec3 getKa(tinygltf::Material material) {
+      const glm::vec3 &baseColor = glm::vec3(material.values["baseColorFactor"].number_array[0], material.values["baseColorFactor"].number_array[1], material.values["baseColorFactor"].number_array[2]);
+      const glm::vec3 &metallic = glm::vec3(material.values["metallicFactor"].number_array[0], material.values["metallicFactor"].number_array[1], material.values["metallicFactor"].number_array[2]);
+      const glm::vec3 roughness = glm::vec3(material.values["roughnessFactor"].number_array[0], material.values["roughnessFactor"].number_array[1], material.values["roughnessFactor"].number_array[2]);
+
+      const glm::vec3 &first = baseColor * (1 - dielectricSpecular[0]);
+
+      const auto c = lerp(&first, &black, &metallic);
+      // const auto f = lerp(dielectricSpecular, baseColor, metallic);
+      // const auto a = roughness * roughness;
+
+      return baseColor;
+    }
+
+    const glm::vec3 getKd(tinygltf::Material material) {
+
+    }
+
+    const glm::vec3 getKs(tinygltf::Material material) {
+
+    }
+
+    const glm::vec3 getShininess(tinygltf::Material material) {
+
+    }
+
     const glmlv::fs::path m_AppPath;
     const std::string m_AppName;
     const std::string m_ImGuiIniFilename;
