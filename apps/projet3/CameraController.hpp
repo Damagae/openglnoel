@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glmlv/glfw.hpp>
 
 struct GLFWwindow;
 
@@ -21,19 +22,28 @@ class CameraController {
   	float m_fAngleX = 0.f;		// Angle effectuée par la caméra autour de l'axe X de la scène
   	float m_fAngleY = 0.f;		// Angle effectuée par la caméra autour de l'axe Y de la scène
 
+    glm::dvec2 m_PreviousDelta;
+
   	// Returns true if zoom is max/min, false if not
-    bool zoomMax() {
-    	return (m_fDistance <= 25.0);
+    bool zoomMin(float delta) {
+    	return (m_fDistance + delta <= 2.0);
     }
 
-    bool zoomMin() {
-    	return (m_fDistance >= 50.0);
+    bool zoomMax(float delta) {
+    	return (m_fDistance + delta >= 50.0);
     }
-
 
   public:
+    static double scrollOffset;
+
     CameraController(GLFWwindow* window, float speed = 1.f) :
-        m_pWindow(window), m_fSpeed(speed) { }
+        m_pWindow(window), m_fSpeed(speed) {
+          glfwSetScrollCallback(window, zoomCB);
+        }
+
+    static void zoomCB(GLFWwindow* window, double xoffset, double yoffset) {
+        scrollOffset += yoffset;
+    }
 
     void setSpeed(float speed) { m_fSpeed = speed; }
 
@@ -65,7 +75,9 @@ class CameraController {
     //permettant d'avancer / reculer la caméra. Lorsque delta est positif la caméra doit avancer, sinon elle doit reculer.
     void moveFront(float delta)
     {
-    	m_fDistance += delta;
+      if (!zoomMin(delta) && !zoomMax(delta)) {
+        m_fDistance += delta;
+      }
     }
 
     // Rotate the camera on the X axis
@@ -81,5 +93,4 @@ class CameraController {
     {
     	m_fAngleY += degrees;
     }
-
 };
