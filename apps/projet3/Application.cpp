@@ -291,6 +291,7 @@ Application::Application(int argc, char** argv):
 		std::cout << "# of images       : " << m_Model.images.size() << std::endl;
 		std::cout << "# of scenes       : " << m_Model.scenes.size() << std::endl;
 		std::cout << "# of samplers     : " << m_Model.samplers.size() << std::endl;
+		std::cout << "# of cameras      : " << m_Model.cameras.size() << std::endl;
 
 
     // Fill buffers ----------------------
@@ -308,7 +309,7 @@ Application::Application(int argc, char** argv):
     // Attribute location -------------
 
     std::map<std::string, GLint> attribIndexOf;
-    std::vector<std::string> attribNames = {"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0", "JOINTS_0", "WEIGHTS_0"};
+    std::vector<std::string> attribNames = {"POSITION", "NORMAL", "TEXCOORD_0"};
     for (uint location = 0; location < attribNames.size(); ++location) {
       attribIndexOf.insert(std::make_pair(attribNames[location], location));
     }
@@ -369,13 +370,12 @@ Application::Application(int argc, char** argv):
 
 
 		// Samplers -----------------------
-		// Samplers ------------------------
 
 		for (tinygltf::Sampler sampler : m_Model.samplers) {
 			GLuint samplerId;
 			glGenSamplers(1, &samplerId);
-			glSamplerParameteri(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
-			glSamplerParameteri(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
+			glSamplerParameterf(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
+			glSamplerParameterf(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_S, sampler.wrapS);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_T, sampler.wrapT);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_R, sampler.wrapR);
