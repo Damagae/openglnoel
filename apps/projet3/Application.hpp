@@ -20,6 +20,7 @@ public:
     int run();
 private:
     void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
+    void initShadersData();
 
     glm::mat4 scaleModel(glm::mat4 matrix) {
       return glm::scale(matrix, m_ModelScaling);
@@ -127,6 +128,29 @@ private:
     const int m_nWindowHeight = 720;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
 
+    // GBuffer:
+    enum GBufferTextureType
+    {
+        GPosition = 0,
+        GNormal,
+        GAmbient,
+        GDiffuse,
+        GGlossyShininess,
+        GDepth,
+        GBufferTextureCount
+    };
+
+    const char * m_GBufferTexNames[GBufferTextureCount + 1] = { "position", "normal", "ambient", "diffuse", "glossyShininess", "depth", "beauty" }; // Tricks, since we cant blit depth, we use its value to draw the result of the shading pass
+    const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+    GLuint m_GBufferTextures[GBufferTextureCount];
+    GLuint m_GBufferFBO; // Framebuffer object
+
+    GBufferTextureType m_CurrentlyDisplayed = GBufferTextureCount; // Default to beauty
+
+    // Triangle covering the whole screen, for the shading pass:
+    GLuint m_TriangleVBO = 0;
+    GLuint m_TriangleVAO = 0;
+
     const glmlv::fs::path m_AppPath;
     const std::string m_AppName;
     const std::string m_ImGuiIniFilename;
@@ -163,19 +187,41 @@ private:
 
     // glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
     CameraController m_CameraController{ m_GLFWHandle.window(), 0.008f };
+
+    // GLSL programs
+    glmlv::GLProgram m_geometryPassProgram;
+    glmlv::GLProgram m_shadingPassProgram;
+    glmlv::GLProgram m_displayDepthProgram;
+    glmlv::GLProgram m_displayPositionProgram;
+
+    // Geometry pass uniforms
     GLint m_uModelViewProjMatrixLocation;
     GLint m_uModelViewMatrixLocation;
     GLint m_uNormalMatrixLocation;
+    GLint m_uKaLocation;
+    GLint m_uKdLocation;
+    GLint m_uKsLocation;
+    GLint m_uShininessLocation;
+    GLint m_uKaSamplerLocation;
+    GLint m_uKdSamplerLocation;
+    GLint m_uKsSamplerLocation;
+    GLint m_uShininessSamplerLocation;
 
+    // Shading pass uniforms
+    GLint m_uGBufferSamplerLocations[GDepth];
     GLint m_uDirectionalLightDirLocation;
     GLint m_uDirectionalLightIntensityLocation;
-
     GLint m_uPointLightPositionLocation;
     GLint m_uPointLightIntensityLocation;
 
-    GLint m_uKdLocation;
-    GLint m_uKdSamplerLocation;
+    // Display depth pass uniforms
+    GLint m_uGDepthSamplerLocation;
 
+    // Display position pass uniforms
+    GLint m_uGPositionSamplerLocation;
+    GLint m_uSceneSizeLocation;
+
+    // Lights
     float m_DirLightPhiAngleDegrees = 90.f;
     float m_DirLightThetaAngleDegrees = 45.f;
     glm::vec3 m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
