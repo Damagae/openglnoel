@@ -157,6 +157,11 @@ private:
         return -glm::normalize(glm::vec3(sinPhi * cosTheta, -glm::sin(thetaRadians), cosPhi * cosTheta));
     }
 
+    // Custom lerp function because couldn't make glm::lerp works properly
+    static glm::vec3 lerp(glm::vec3 x, glm::vec3 y, glm::vec3 a) {
+        return x * (glm::vec3(1.0f) - a) + y * a;
+    }
+
     const int m_nWindowWidth = 1280;
     const int m_nWindowHeight = 720;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
@@ -192,26 +197,38 @@ private:
     const glm::vec3 dielectricSpecular = glm::vec3(0.04, 0.04, 0.04);
     const glm::vec3 black = glm::vec3(0, 0, 0);
 
-    const glm::vec3 getKa(tinygltf::Material material) {
+
+    // Shading PBR functions
+    const glm::vec3 getKd(tinygltf::Material material) {
+
       const glm::vec3 &baseColor = glm::vec3(material.values["baseColorFactor"].number_array[0], material.values["baseColorFactor"].number_array[1], material.values["baseColorFactor"].number_array[2]);
       const glm::vec3 &metallic = glm::vec3(material.values["metallicFactor"].number_array[0], material.values["metallicFactor"].number_array[1], material.values["metallicFactor"].number_array[2]);
       const glm::vec3 roughness = glm::vec3(material.values["roughnessFactor"].number_array[0], material.values["roughnessFactor"].number_array[1], material.values["roughnessFactor"].number_array[2]);
 
       const glm::vec3 &first = baseColor * (1 - dielectricSpecular[0]);
 
-      // const auto c = lerp(&first, &black, &metallic);
-      // const auto f = lerp(dielectricSpecular, baseColor, metallic);
-      // const auto a = roughness * roughness;
+      const auto c = lerp(first, black, metallic);
+      const auto f = lerp(dielectricSpecular, baseColor, metallic);
+      const auto a = roughness * roughness;
 
-      return baseColor;
-    }
-
-    const glm::vec3 getKd(tinygltf::Material material) {
+      return (glm::vec3(1.f) - f) * c;
 
     }
 
     const glm::vec3 getKs(tinygltf::Material material) {
+      const glm::vec3 &baseColor = glm::vec3(material.values["baseColorFactor"].number_array[0], material.values["baseColorFactor"].number_array[1], material.values["baseColorFactor"].number_array[2]);
+      const glm::vec3 &metallic = glm::vec3(material.values["metallicFactor"].number_array[0], material.values["metallicFactor"].number_array[1], material.values["metallicFactor"].number_array[2]);
+      const glm::vec3 roughness = glm::vec3(material.values["roughnessFactor"].number_array[0], material.values["roughnessFactor"].number_array[1], material.values["roughnessFactor"].number_array[2]);
 
+      const glm::vec3 one = glm::vec3(1.f);
+
+      const auto cdiff = lerp(baseColor * (1 - dielectricSpecular[0]), black, metallic);
+      const auto f0 = lerp(dielectricSpecular, baseColor, metallic);
+      const auto alpha = roughness * roughness;
+
+      const auto f = f0 + (one - f0); // * one
+
+      return glm::vec3(0.f);
     }
 
     const glm::vec3 getShininess(tinygltf::Material material) {
