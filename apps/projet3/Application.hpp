@@ -286,6 +286,8 @@ private:
     GLint m_uDirLightViewProjMatrix_shadingPass; // Suffix because the variable m_uDirLightViewProjMatrix is already used for the uniform of m_directionalSMProgram.
     GLint m_uDirLightShadowMap;
     GLint m_uDirLightShadowMapBias;
+    GLint m_uDirLightShadowMapSampleCount;
+    GLint m_uDirLightShadowMapSpread;
 
     // Display depth pass uniforms
     GLint m_uGDepthSamplerLocation;
@@ -302,8 +304,10 @@ private:
     float m_DirLightThetaAngleDegrees = 45.f;
     glm::vec3 m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
     glm::vec3 m_DirLightColor = glm::vec3(1, 1, 1);
-    float m_DirLightSMBias = 0.01f;
     float m_DirLightIntensity = 1.4f;
+    float m_DirLightSMBias = 0.01f;
+    int m_DirLightSMSampleCount = 16;
+    float m_DirLightSMSpread = 0.0005;
 
     glm::vec3 m_PointLightPosition = glm::vec3(0, 1, 0);
     glm::vec3 m_PointLightColor = glm::vec3(1, 1, 1);

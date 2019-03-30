@@ -17,6 +17,7 @@ int Application::run()
 	glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
 
 	bool directionalSMDirty = true;
+	bool directionalSMResolutionDirty = false;
 
 	std::cout << "scene radius = " << m_SceneSizeLength * 0.5f << std::endl;
 	std::cout << "scene center = " << m_SceneCenter * 0.5f << std::endl;
@@ -42,6 +43,33 @@ int Application::run()
 				const auto dirLightProjMatrix = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.01f * sceneRadius, 2.f * sceneRadius);
 
 				// Shadow Map
+				if (directionalSMResolutionDirty) {
+                glDeleteTextures(1, &m_directionalSMTexture);
+
+                // Realocate texture
+                glGenTextures(1, &m_directionalSMTexture);
+                glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+                glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, m_nDirectionalSMResolution, m_nDirectionalSMResolution);
+                glBindTexture(GL_TEXTURE_2D, 0);
+
+                // Attach new texture to FBO
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_directionalSMFBO);
+                glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_directionalSMTexture, 0);
+
+                const auto fboStatus = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+                if (fboStatus != GL_FRAMEBUFFER_COMPLETE)
+                {
+                    std::cerr << "Error on building directional shadow mapping framebuffer. Error code = " << fboStatus << std::endl;
+                    throw std::runtime_error("Error on building directional shadow mapping framebuffer.");
+                }
+
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+                directionalSMResolutionDirty = false;
+                directionalSMDirty = true; // The shadow map must also be recomputed
+				}
+
 				if (directionalSMDirty) {
 
 						 m_directionalSMProgram.use();
@@ -167,6 +195,9 @@ int Application::run()
                 glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
 
 								glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
+								glUniform1iv(m_uDirLightShadowMapSampleCount, 1, &m_DirLightSMSampleCount);
+								glUniform1fv(m_uDirLightShadowMapSpread, 1, &m_DirLightSMSpread);
+
 								glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
 
                 for (int32_t i = GPosition; i < GDepth; ++i) {
@@ -262,14 +293,16 @@ int Application::run()
 										 directionalSMDirty = true;
 								 }
 
-								 // if (ImGui::InputInt("DirShadowMap Res", &m_nDirectionalSMResolution)) {
-	               //      if (m_nDirectionalSMResolution <= 0) {
-	               //          m_nDirectionalSMResolution = 1;
-									// 		}
-	               //      directionalSMResolutionDirty = true;
-									// }
-								 //
-								 // ImGui::InputFloat("DirShadowMap Bias", &m_DirLightSMBias);
+								 if (ImGui::InputInt("DirShadowMap Res", &m_nDirectionalSMResolution)) {
+	                    if (m_nDirectionalSMResolution <= 0) {
+	                        m_nDirectionalSMResolution = 1;
+											}
+	                    directionalSMResolutionDirty = true;
+									}
+
+								 ImGui::InputFloat("DirShadowMap Bias", &m_DirLightSMBias);
+								 ImGui::InputInt("DirShadowMap SampleCount", &m_DirLightSMSampleCount);
+								 ImGui::InputFloat("DirShadowMap Spread", &m_DirLightSMSpread);
              }
 
              if (ImGui::CollapsingHeader("Point Light"))
@@ -564,7 +597,9 @@ void Application::initShadersData() {
 
 		m_uDirLightViewProjMatrix_shadingPass = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightViewProjMatrix");
     m_uDirLightShadowMap = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMap");
-		m_uDirLightShadowMapBias = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMapBias");
+    m_uDirLightShadowMapBias = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMapBias");
+    m_uDirLightShadowMapSampleCount = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMapSampleCount");
+		m_uDirLightShadowMapSpread = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMapSpread");
 
     m_uDirectionalLightDirLocation = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirectionalLightDir");
     m_uDirectionalLightIntensityLocation = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirectionalLightIntensity");
