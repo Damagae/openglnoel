@@ -43,7 +43,7 @@ int Application::run()
 
 				// Shadow Map
 				if (directionalSMDirty) {
-					
+
 						 m_directionalSMProgram.use();
 
 						 glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_directionalSMFBO);
@@ -608,10 +608,12 @@ void Application::initShadowData() {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     glGenSamplers(1, &m_directionalSMSampler);
-    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 }
 
 void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {

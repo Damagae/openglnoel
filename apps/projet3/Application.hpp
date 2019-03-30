@@ -302,12 +302,12 @@ private:
     float m_DirLightThetaAngleDegrees = 45.f;
     glm::vec3 m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
     glm::vec3 m_DirLightColor = glm::vec3(1, 1, 1);
+    float m_DirLightSMBias = 0.01f;
     float m_DirLightIntensity = 1.4f;
 
     glm::vec3 m_PointLightPosition = glm::vec3(0, 1, 0);
     glm::vec3 m_PointLightColor = glm::vec3(1, 1, 1);
-    float m_PointLightIntensity = 5.f;
-    float m_DirLightSMBias = 0.01f;
+    float m_PointLightIntensity = 0.f;
 
     glm::vec3 m_CubeKd = glm::vec3(1, 0, 0);
     glm::vec3 m_SphereKd = glm::vec3(0, 1, 0);
