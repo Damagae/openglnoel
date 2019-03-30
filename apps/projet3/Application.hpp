@@ -175,7 +175,7 @@ private:
     };
 
     const char * m_GBufferTexNames[GBufferTextureCount + 1] = { "position", "normal", "ambient", "diffuse", "glossyShininess", "depth", "directionalLightDepth", "beauty" }; // Tricks, since we cant blit depth, we use its value to draw the result of the shading pass
-    const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+    const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT32F };
     GLuint m_GBufferTextures[GBufferTextureCount];
     GLuint m_GBufferFBO; // Framebuffer object
 

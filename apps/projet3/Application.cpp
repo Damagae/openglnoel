@@ -337,6 +337,8 @@ int Application::run()
          if (!guiHasFocus) {
              m_CameraController.update(float(ellapsedTime));
          }
+
+				 // exit(0);
      }
 
  	 	return 0;
@@ -528,11 +530,13 @@ Application::Application(int argc, char** argv):
     // Init GBuffer
 		glGenTextures(GBufferTextureCount, m_GBufferTextures);
 
+
 		for (int32_t i = GPosition; i < GBufferTextureCount; ++i)
     {
         glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
         glTexStorage2D(GL_TEXTURE_2D, 1, m_GBufferTextureFormat[i], m_nWindowWidth, m_nWindowHeight);
 		}
+
 
 		glGenFramebuffers(1, &m_GBufferFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_GBufferFBO);
