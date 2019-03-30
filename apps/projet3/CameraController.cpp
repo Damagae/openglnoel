@@ -11,7 +11,7 @@ bool CameraController::update(float elapsedTime)
     bool hasMoved = false;
 
     if (scrollOffset != 0) {
-      moveFront(scrollOffset * m_fSpeed);
+      moveFront(-scrollOffset * m_fSpeed);
       if (scrollOffset < 0 && scrollOffset + m_fSpeed/2 < 0) {
         scrollOffset += m_fSpeed/2;
       }

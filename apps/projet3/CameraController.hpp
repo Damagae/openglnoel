@@ -77,7 +77,10 @@ class CameraController {
       	return m_ViewMatrix;
     }
 
-    const glm::mat4& getRcpViewMatrix() const { return m_RcpViewMatrix; }
+    glm::mat4& getRcpViewMatrix() {
+        m_RcpViewMatrix = glm::inverse(m_ViewMatrix);
+        return m_RcpViewMatrix;
+    }
 
     // Move the camera towards
     //permettant d'avancer / reculer la caméra. Lorsque delta est positif la caméra doit avancer, sinon elle doit reculer.
