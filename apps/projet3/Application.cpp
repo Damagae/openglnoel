@@ -16,6 +16,11 @@ int Application::run()
 	float clearColor[3] = { 0.9, 0.9, 0.8 };
 	glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
 
+	bool directionalSMDirty = true;
+
+	std::cout << "scene radius = " << m_SceneSizeLength * 0.5f << std::endl;
+	std::cout << "scene center = " << m_SceneCenter * 0.5f << std::endl;
+
     // Loop until the user closes the window
     for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
     {
@@ -24,6 +29,46 @@ int Application::run()
 				const auto viewportSize = m_GLFWHandle.framebufferSize();
 				const auto projMatrix = glm::perspective(70.f, float(viewportSize.x) / viewportSize.y, 0.01f, 100.f);
 				const auto viewMatrix = m_CameraController.getViewMatrix();
+				const auto rcpViewMatrix = m_CameraController.getRcpViewMatrix();
+
+				m_SceneSizeLength = 10.f;
+				m_SceneCenter = glm::vec3(1.f, 1.f, 1.f);
+
+				const float sceneRadius = m_SceneSizeLength * 10.f;
+
+				const auto dirLightUpVector = computeDirectionVectorUp(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
+				// const auto dirLightViewMatrix = glm::lookAt(m_SceneCenter + m_DirLightDirection * sceneRadius, m_SceneCenter, dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
+        const auto dirLightViewMatrix = glm::lookAt(glm::vec3(0.f) + m_DirLightDirection * 100.f, glm::vec3(0.f), dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
+				const auto dirLightProjMatrix = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.01f * sceneRadius, 2.f * sceneRadius);
+
+				// Shadow Map
+				if (directionalSMDirty) {
+					
+						 m_directionalSMProgram.use();
+
+						 glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_directionalSMFBO);
+						 glViewport(0, 0, m_nDirectionalSMResolution, m_nDirectionalSMResolution);
+						 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+						 glUniformMatrix4fv(m_uDirLightViewProjMatrix, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix));
+
+
+						 for (uint id = 0; id < m_VAOs.size(); ++id) {
+									auto vao = m_VAOs[id];
+									tinygltf::Primitive primitive = m_Primitives[id];
+
+									tinygltf::Accessor indices = m_Model.accessors[primitive.indices];
+									int mode = getMode(primitive.mode);
+
+									glBindVertexArray(vao);
+							 		glDrawElements(mode, indices.count, indices.componentType, (const void*) indices.byteOffset);
+						 }
+
+						 glBindVertexArray(0);
+						 glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+						 directionalSMDirty = false; // Pas de calcul au prochain tour
+				}
 
 				// Geometry Pass
 				{
@@ -121,12 +166,20 @@ int Application::run()
                 glUniform3fv(m_uPointLightPositionLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(m_PointLightPosition, 1))));
                 glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
 
+								glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
+								glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
+
                 for (int32_t i = GPosition; i < GDepth; ++i) {
                     glActiveTexture(GL_TEXTURE0 + i);
                     glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
 
                     glUniform1i(m_uGBufferSamplerLocations[i], i);
                 }
+
+								glActiveTexture(GL_TEXTURE0 + GDepth);
+                glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+                glBindSampler(GDepth, m_directionalSMSampler);
+								glUniform1i(m_uDirLightShadowMap, GDepth);
 
                 glBindVertexArray(m_TriangleVAO);
                 glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -145,6 +198,19 @@ int Application::run()
             glDrawArrays(GL_TRIANGLES, 0, 3);
             glBindVertexArray(0);
         }
+				else if (m_CurrentlyDisplayed == Display_DirectionalLightDepthMap)
+        {
+            m_displayDepthProgram.use();
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+
+            glUniform1i(m_uGDepthSamplerLocation, 0);
+
+            glBindVertexArray(m_TriangleVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+				}
         else if (m_CurrentlyDisplayed == GPosition) {
             m_displayPositionProgram.use();
 
@@ -188,17 +254,29 @@ int Application::run()
              {
                  ImGui::ColorEdit3("DirLightColor", glm::value_ptr(m_DirLightColor));
                  ImGui::DragFloat("DirLightIntensity", &m_DirLightIntensity, 0.1f, 0.f, 100.f);
-                 if (ImGui::DragFloat("Phi Angle", &m_DirLightPhiAngleDegrees, 1.0f, 0.0f, 360.f) ||
-                     ImGui::DragFloat("Theta Angle", &m_DirLightThetaAngleDegrees, 1.0f, 0.0f, 180.f)) {
-                     m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
-                 }
+                 bool angleChanged = ImGui::DragFloat("Phi Angle", &m_DirLightPhiAngleDegrees, 1.0f, 0.0f, 360.f);
+                 angleChanged = ImGui::DragFloat("Theta Angle", &m_DirLightThetaAngleDegrees, 1.0f, 0.0f, 180.f) || angleChanged;
+
+								 if (angleChanged) {
+										 m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
+										 directionalSMDirty = true;
+								 }
+
+								 // if (ImGui::InputInt("DirShadowMap Res", &m_nDirectionalSMResolution)) {
+	               //      if (m_nDirectionalSMResolution <= 0) {
+	               //          m_nDirectionalSMResolution = 1;
+									// 		}
+	               //      directionalSMResolutionDirty = true;
+									// }
+								 //
+								 // ImGui::InputFloat("DirShadowMap Bias", &m_DirLightSMBias);
              }
 
              if (ImGui::CollapsingHeader("Point Light"))
              {
                  ImGui::ColorEdit3("PointLightColor", glm::value_ptr(m_PointLightColor));
                  ImGui::DragFloat("PointLightIntensity", &m_PointLightIntensity, 0.1f, 0.f, 16000.f);
-                 ImGui::InputFloat3("Position", glm::value_ptr(m_PointLightPosition));
+                 ImGui::DragFloat3("Position", glm::value_ptr(m_PointLightPosition), 0.5f);
              }
 
              if (ImGui::CollapsingHeader("GBuffer"))
@@ -374,8 +452,8 @@ Application::Application(int argc, char** argv):
 		for (tinygltf::Sampler sampler : m_Model.samplers) {
 			GLuint samplerId;
 			glGenSamplers(1, &samplerId);
-			glSamplerParameterf(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
-			glSamplerParameterf(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
+			glSamplerParameteri(samplerId, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
+			glSamplerParameteri(samplerId, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_S, sampler.wrapS);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_T, sampler.wrapT);
 			glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_R, sampler.wrapR);
@@ -397,25 +475,18 @@ Application::Application(int argc, char** argv):
 
 			GLuint texId = 0;
       glGenTextures(1, &texId);
-			// glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
       glBindTexture(GL_TEXTURE_2D, texId);
-
-			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, sampler.minFilter);
-			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, sampler.magFilter);
-			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, sampler.wrapS);
-			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, sampler.wrapT);
-			// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, sampler.wrapR);
-
 			GLenum format = image.component == 3 ? GL_RGB : GL_RGBA;
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, image.width, image.height);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, format, GL_UNSIGNED_BYTE, &image.image.at(0));
-			// glTexImage2D(GL_TEXTURE_2D, 0, format, image.width, image.height, 0, format, GL_UNSIGNED_BYTE, &image.image.at(0));
 
       glBindTexture(GL_TEXTURE_2D, 0);
 
 			m_TextureIds.push_back(texId);
 
 		}
+
+		initShadowData();
 
 		initShadersData();
 
@@ -491,6 +562,10 @@ void Application::initShadersData() {
     m_uGBufferSamplerLocations[GDiffuse] = glGetUniformLocation(m_shadingPassProgram.glId(), "uGDiffuse");
     m_uGBufferSamplerLocations[GGlossyShininess] = glGetUniformLocation(m_shadingPassProgram.glId(), "uGGlossyShininess");
 
+		m_uDirLightViewProjMatrix_shadingPass = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightViewProjMatrix");
+    m_uDirLightShadowMap = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMap");
+		m_uDirLightShadowMapBias = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirLightShadowMapBias");
+
     m_uDirectionalLightDirLocation = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirectionalLightDir");
     m_uDirectionalLightIntensityLocation = glGetUniformLocation(m_shadingPassProgram.glId(), "uDirectionalLightIntensity");
 
@@ -505,6 +580,38 @@ void Application::initShadersData() {
 
     m_uGPositionSamplerLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uGPosition");
 		m_uSceneSizeLocation = glGetUniformLocation(m_displayPositionProgram.glId(), "uSceneSize");
+
+		m_directionalSMProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "directionalSM.vs.glsl", m_ShadersRootPath / m_AppName / "directionalSM.fs.glsl" });
+		m_uDirLightViewProjMatrix = glGetUniformLocation(m_directionalSMProgram.glId(), "uDirLightViewProjMatrix");
+}
+
+void Application::initShadowData() {
+
+    glGenTextures(1, &m_directionalSMTexture);
+
+    glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, m_nDirectionalSMResolution, m_nDirectionalSMResolution);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenFramebuffers(1, &m_directionalSMFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_directionalSMFBO);
+    glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_directionalSMTexture, 0);
+
+    const auto fboStatus = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+    if (fboStatus != GL_FRAMEBUFFER_COMPLETE)
+    {
+        std::cerr << "Error on building directional shadow mapping framebuffer. Error code = " << fboStatus << std::endl;
+        throw std::runtime_error("Error on building directional shadow mapping framebuffer.");
+    }
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+    glGenSamplers(1, &m_directionalSMSampler);
+    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(m_directionalSMSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 }
 
 void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
@@ -538,6 +645,60 @@ void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
 			const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
 			modelMatrix = glm::translate(modelMatrix, translation);
 		}
+
+		// Resizing
+		bool firstLoop = true;
+		float min = 0.f;
+		float max = 0.f;
+		if (node.mesh > -1) {
+
+			tinygltf::Mesh mesh = m_Model.meshes[node.mesh];
+			for (auto primitive : mesh.primitives) {
+				tinygltf::Accessor accessor = m_Model.accessors[primitive.indices];
+
+				if (accessor.minValues.size() > 0 && accessor.maxValues.size() > 0) {
+						float primitiveMin = accessor.minValues[0];
+						float primitiveMax = accessor.maxValues[0];
+						if (firstLoop) {
+								min = primitiveMin;
+								max = primitiveMax;
+								firstLoop = false;
+						} else {
+								if (primitiveMin < min) {
+									min = primitiveMin;
+								}
+								if (primitiveMax > max) {
+									max = primitiveMax;
+								}
+						}
+				}
+			}
+			glm::vec3 meshCenter = 0.5f * (glm::vec3(max) + glm::vec3(min));
+			glm::vec3 meshSize = glm::vec3(max) - glm::vec3(min);
+			float meshLength = glm::length(meshSize);
+			std::cout << "Mesh center = " << meshCenter << std::endl;
+
+			float maxAxis = meshSize[0];
+			if (meshSize[1] > maxAxis) { maxAxis = meshSize[1]; }
+			if (meshSize[2] > maxAxis) { maxAxis = meshSize[2]; }
+
+			// modelMatrix = glm::scale(modelMatrix, glm::vec3(1 / maxAxis));
+			// modelMatrix = glm::translate(modelMatrix, glm::vec3(0.f, -meshSize[1] * 0.5, 0.f));
+
+			if (m_SceneCenter != glm::vec3(0.f)) {
+				m_SceneCenter = 0.5f * (m_SceneCenter + meshCenter);
+			}
+			else {
+				m_SceneCenter = meshCenter;
+			}
+
+			m_SceneSize += meshSize;
+			m_SceneSizeLength += meshLength;
+
+
+
+		}
+
 
 	}
 

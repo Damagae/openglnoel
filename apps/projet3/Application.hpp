@@ -27,9 +27,10 @@ public:
 private:
     void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
     void initShadersData();
+    void initShadowData();
 
     glm::mat4 scaleModel(glm::mat4 matrix) {
-      return glm::scale(matrix, m_ModelScaling);
+      return glm::translate(glm::scale(matrix, m_ModelScaling), m_ModelTranslating);
     }
 
     void computeScaling() {
@@ -77,6 +78,19 @@ private:
       }
 
       m_ModelScaling = glm::vec3(scaleFactor, scaleFactor, scaleFactor);
+    }
+
+    void computeScaling2() {
+       float maxAxis = m_SceneSize[0];
+       if (m_SceneSize[1] > maxAxis) { maxAxis = m_SceneSize[1]; }
+       if (m_SceneSize[2] > maxAxis) { maxAxis = m_SceneSize[2]; }
+
+       std::cout << "max axis = " << maxAxis << std::endl;
+       std::cout << "Scene Size = " << m_SceneSize << std::endl;
+
+       m_ModelScaling = glm::vec3(3000 / maxAxis);
+       std::cout << "scaling = " << m_ModelScaling << std::endl;
+ 			 m_ModelTranslating = glm::vec3(0.f, m_SceneSize[1] * (3000 / maxAxis) * 0.005, 0.f);
     }
 
     static glm::mat4 quatToMatrix(glm::vec4 q) {
@@ -136,6 +150,13 @@ private:
       return -1;
     }
 
+    static glm::vec3 computeDirectionVectorUp(float phiRadians, float thetaRadians) {
+        const auto cosPhi = glm::cos(phiRadians);
+        const auto sinPhi = glm::sin(phiRadians);
+        const auto cosTheta = glm::cos(thetaRadians);
+        return -glm::normalize(glm::vec3(sinPhi * cosTheta, -glm::sin(thetaRadians), cosPhi * cosTheta));
+    }
+
     const int m_nWindowWidth = 1280;
     const int m_nWindowHeight = 720;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
@@ -149,10 +170,11 @@ private:
         GDiffuse,
         GGlossyShininess,
         GDepth,
+        Display_DirectionalLightDepthMap,
         GBufferTextureCount
     };
 
-    const char * m_GBufferTexNames[GBufferTextureCount + 1] = { "position", "normal", "ambient", "diffuse", "glossyShininess", "depth", "beauty" }; // Tricks, since we cant blit depth, we use its value to draw the result of the shading pass
+    const char * m_GBufferTexNames[GBufferTextureCount + 1] = { "position", "normal", "ambient", "diffuse", "glossyShininess", "depth", "directionalLightDepth", "beauty" }; // Tricks, since we cant blit depth, we use its value to draw the result of the shading pass
     const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
     GLuint m_GBufferTextures[GBufferTextureCount];
     GLuint m_GBufferFBO; // Framebuffer object
@@ -162,6 +184,10 @@ private:
     // Triangle covering the whole screen, for the shading pass:
     GLuint m_TriangleVBO = 0;
     GLuint m_TriangleVAO = 0;
+
+    glm::vec3 m_SceneSize = glm::vec3(0.f); // Used for camera speed and projection matrix parameters
+    float m_SceneSizeLength = 0.f;
+    glm::vec3 m_SceneCenter = glm::vec3(0.f);
 
     const glm::vec3 dielectricSpecular = glm::vec3(0.04, 0.04, 0.04);
     const glm::vec3 black = glm::vec3(0, 0, 0);
@@ -173,7 +199,7 @@ private:
 
       const glm::vec3 &first = baseColor * (1 - dielectricSpecular[0]);
 
-      const auto c = lerp(&first, &black, &metallic);
+      // const auto c = lerp(&first, &black, &metallic);
       // const auto f = lerp(dielectricSpecular, baseColor, metallic);
       // const auto a = roughness * roughness;
 
@@ -209,6 +235,7 @@ private:
     std::vector<tinygltf::Primitive> m_Primitives;
 
     glm::vec3 m_ModelScaling = glm::vec3(1,1,1);
+    glm::vec3 m_ModelTranslating = glm::vec3(0,0,0);
 
     glmlv::SimpleGeometry m_cubeGeometry;
     glmlv::SimpleGeometry m_sphereGeometry;
@@ -235,6 +262,7 @@ private:
     glmlv::GLProgram m_shadingPassProgram;
     glmlv::GLProgram m_displayDepthProgram;
     glmlv::GLProgram m_displayPositionProgram;
+    glmlv::GLProgram m_directionalSMProgram;
 
     // Geometry pass uniforms
     GLint m_uModelViewProjMatrixLocation;
@@ -255,6 +283,9 @@ private:
     GLint m_uDirectionalLightIntensityLocation;
     GLint m_uPointLightPositionLocation;
     GLint m_uPointLightIntensityLocation;
+    GLint m_uDirLightViewProjMatrix_shadingPass; // Suffix because the variable m_uDirLightViewProjMatrix is already used for the uniform of m_directionalSMProgram.
+    GLint m_uDirLightShadowMap;
+    GLint m_uDirLightShadowMapBias;
 
     // Display depth pass uniforms
     GLint m_uGDepthSamplerLocation;
@@ -263,18 +294,29 @@ private:
     GLint m_uGPositionSamplerLocation;
     GLint m_uSceneSizeLocation;
 
+    // Shadow Mapping uniform
+    GLint m_uDirLightViewProjMatrix;
+
     // Lights
-    float m_DirLightPhiAngleDegrees = 90.f;
+    float m_DirLightPhiAngleDegrees = 16.f;
     float m_DirLightThetaAngleDegrees = 45.f;
     glm::vec3 m_DirLightDirection = computeDirectionVector(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
     glm::vec3 m_DirLightColor = glm::vec3(1, 1, 1);
-    float m_DirLightIntensity = 1.f;
+    float m_DirLightIntensity = 1.4f;
 
     glm::vec3 m_PointLightPosition = glm::vec3(0, 1, 0);
     glm::vec3 m_PointLightColor = glm::vec3(1, 1, 1);
     float m_PointLightIntensity = 5.f;
+    float m_DirLightSMBias = 0.01f;
 
     glm::vec3 m_CubeKd = glm::vec3(1, 0, 0);
     glm::vec3 m_SphereKd = glm::vec3(0, 1, 0);
     glm::vec3 m_ModelKd = glm::vec3(0, 1, 0);
+
+    // Shadow mapping
+    GLuint m_directionalSMTexture;
+    GLuint m_directionalSMFBO;
+    GLuint m_directionalSMSampler;
+    int32_t m_nDirectionalSMResolution = 4096;
+
 };

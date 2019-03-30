@@ -15,6 +15,10 @@ uniform vec3 uDirectionalLightIntensity;
 uniform vec3 uPointLightPosition;
 uniform vec3 uPointLightIntensity;
 
+uniform mat4 uDirLightViewProjMatrix;
+uniform sampler2D uDirLightShadowMap;
+uniform float uDirLightShadowMapBias;
+
 void main()
 {
     vec3 position = vec3(texelFetch(uGPosition, ivec2(gl_FragCoord.xy), 0));
@@ -45,7 +49,12 @@ void main()
         dothDirLight = pow(dothDirLight, shininess);
     }
 
+    vec4 positionInDirLightScreen = uDirLightViewProjMatrix * vec4(position, 1); // Compute fragment position in NDC space of light
+    vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5; // Homogeneize + put between 0 and 1
+    float depthBlockerInDirSpace = texture(uDirLightShadowMap, positionInDirLightNDC.xy).r;
+    float dirLightVisibility = positionInDirLightNDC.z < depthBlockerInDirSpace + uDirLightShadowMapBias ? 1.0 : 0.0;
+
     fColor = ka;
-    fColor += kd * (uDirectionalLightIntensity * max(0.f, dot(normal, uDirectionalLightDir)) + pointLightIncidentLight * max(0., dot(normal, dirToPointLight)));
-    fColor += ks * (uDirectionalLightIntensity * dothDirLight + pointLightIncidentLight * dothPointLight);
+    fColor += kd * (dirLightVisibility * uDirectionalLightIntensity * max(0.f, dot(normal, uDirectionalLightDir)) + pointLightIncidentLight * max(0., dot(normal, dirToPointLight)));
+    fColor += ks * (dirLightVisibility * uDirectionalLightIntensity * dothDirLight + pointLightIncidentLight * dothPointLight);
 }
