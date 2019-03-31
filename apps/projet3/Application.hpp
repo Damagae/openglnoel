@@ -184,6 +184,9 @@ private:
     GLuint m_GBufferTextures[GBufferTextureCount];
     GLuint m_GBufferFBO; // Framebuffer object
 
+    GLuint m_BeautyTexture;
+    GLuint m_BeautyFBO;
+
     GBufferTextureType m_CurrentlyDisplayed = GBufferTextureCount; // Default to beauty
 
     // Triangle covering the whole screen, for the shading pass:

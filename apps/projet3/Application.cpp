@@ -38,8 +38,8 @@ int Application::run()
 				const float sceneRadius = m_SceneSizeLength * 10.f;
 
 				const auto dirLightUpVector = computeDirectionVectorUp(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
-				// const auto dirLightViewMatrix = glm::lookAt(m_SceneCenter + m_DirLightDirection * sceneRadius, m_SceneCenter, dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
-        const auto dirLightViewMatrix = glm::lookAt(glm::vec3(0.f) + m_DirLightDirection * 100.f, glm::vec3(0.f), dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
+				const auto dirLightViewMatrix = glm::lookAt(m_SceneCenter + m_DirLightDirection * sceneRadius, m_SceneCenter, dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
+        // const auto dirLightViewMatrix = glm::lookAt(glm::vec3(0.f) + m_DirLightDirection * 100.f, glm::vec3(0.f), dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
 				const auto dirLightProjMatrix = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.01f * sceneRadius, 2.f * sceneRadius);
 
 				// Shadow Map
@@ -179,43 +179,58 @@ int Application::run()
 
 					}
 
+					// Shading pass
+					{
+							m_shadingPassProgram.use();
+
+							glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_BeautyFBO);
+
+							glViewport(0, 0, viewportSize.x, viewportSize.y);
+							glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+							glUniform3fv(m_uDirectionalLightDirLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(m_DirLightDirection), 0))));
+							glUniform3fv(m_uDirectionalLightIntensityLocation, 1, glm::value_ptr(m_DirLightColor * m_DirLightIntensity));
+
+							glUniform3fv(m_uPointLightPositionLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(m_PointLightPosition, 1))));
+							glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
+
+							glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
+							glUniform1iv(m_uDirLightShadowMapSampleCount, 1, &m_DirLightSMSampleCount);
+							glUniform1fv(m_uDirLightShadowMapSpread, 1, &m_DirLightSMSpread);
+
+							glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
+
+							for (int32_t i = GPosition; i < GDepth; ++i) {
+									glActiveTexture(GL_TEXTURE0 + i);
+									glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
+
+									glUniform1i(m_uGBufferSamplerLocations[i], i);
+							}
+
+							glActiveTexture(GL_TEXTURE0 + GDepth);
+							glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+							glBindSampler(GDepth, m_directionalSMSampler);
+							glUniform1i(m_uDirLightShadowMap, GDepth);
+
+							glBindVertexArray(m_TriangleVAO);
+							glDrawArrays(GL_TRIANGLES, 0, 3);
+							glBindVertexArray(0);
+
+							glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+					}
+
 				// Put here rendering code
         glViewport(0, 0, viewportSize.x, viewportSize.y);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (m_CurrentlyDisplayed == GBufferTextureCount) { // Beauty
-            // Shading pass
-            {
-                m_shadingPassProgram.use();
 
-                glUniform3fv(m_uDirectionalLightDirLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(m_DirLightDirection), 0))));
-                glUniform3fv(m_uDirectionalLightIntensityLocation, 1, glm::value_ptr(m_DirLightColor * m_DirLightIntensity));
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, m_BeautyFBO);
+					glReadBuffer(GL_COLOR_ATTACHMENT0);
+					glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-                glUniform3fv(m_uPointLightPositionLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(m_PointLightPosition, 1))));
-                glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 
-								glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
-								glUniform1iv(m_uDirLightShadowMapSampleCount, 1, &m_DirLightSMSampleCount);
-								glUniform1fv(m_uDirLightShadowMapSpread, 1, &m_DirLightSMSpread);
-
-								glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
-
-                for (int32_t i = GPosition; i < GDepth; ++i) {
-                    glActiveTexture(GL_TEXTURE0 + i);
-                    glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
-
-                    glUniform1i(m_uGBufferSamplerLocations[i], i);
-                }
-
-								glActiveTexture(GL_TEXTURE0 + GDepth);
-                glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
-                glBindSampler(GDepth, m_directionalSMSampler);
-								glUniform1i(m_uDirLightShadowMap, GDepth);
-
-                glBindVertexArray(m_TriangleVAO);
-                glDrawArrays(GL_TRIANGLES, 0, 3);
-                glBindVertexArray(0);
-            }
         }
         else if (m_CurrentlyDisplayed == GDepth) {
             m_displayDepthProgram.use();
@@ -555,6 +570,29 @@ Application::Application(int argc, char** argv):
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         std::cerr << "FB error, status: " << status << std::endl;
         throw std::runtime_error("FBO error");
+    }
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+		// Init beauty texture and FBO
+    glGenTextures(1, &m_BeautyTexture);
+
+    glBindTexture(GL_TEXTURE_2D, m_BeautyTexture);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, m_nWindowWidth, m_nWindowHeight);
+
+    glGenFramebuffers(1, &m_BeautyFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_BeautyFBO);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_BeautyTexture, 0);
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    {
+        GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "FB error, status: " << status << std::endl;
+            throw std::runtime_error("FBO error");
+        }
     }
 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
