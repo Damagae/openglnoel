@@ -19,8 +19,8 @@ class CameraController {
     glm::mat4 m_ViewMatrix = glm::mat4(1);
     glm::mat4 m_RcpViewMatrix = glm::mat4(1);
 
-    float m_fDistance = 8.f;	// Distance par rapport au centre de la scène
-    float m_fHauteur = 2.f;		// Hauteur de la caméra par rapport au centre de la scène
+    float m_fDistance = 2.f;	// Distance par rapport au centre de la scène
+    float m_fHauteur = 0.f;		// Hauteur de la caméra par rapport au centre de la scène
   	float m_fDecalage = 0.f;		// Hauteur de la caméra par rapport au centre de la scène
   	float m_fAngleX = 0.f;		// Angle effectuée par la caméra autour de l'axe X de la scène
   	float m_fAngleY = 0.f;		// Angle effectuée par la caméra autour de l'axe Y de la scène
@@ -30,11 +30,11 @@ class CameraController {
 
   	// Returns true if zoom is max/min, false if not
     bool zoomMin(float delta) {
-    	return (m_fDistance + delta <= 2.0);
+    	return (m_fDistance + delta <= 0.0);
     }
 
     bool zoomMax(float delta) {
-    	return (m_fDistance + delta >= 50.0);
+    	return (m_fDistance + delta >= 100.0);
     }
 
   public:

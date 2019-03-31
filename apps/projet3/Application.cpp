@@ -21,9 +21,6 @@ int Application::run()
 
 	float gamma = 2.2;
 
-	std::cout << "scene radius = " << m_SceneSizeLength * 0.5f << std::endl;
-	std::cout << "scene center = " << m_SceneCenter * 0.5f << std::endl;
-
     // Loop until the user closes the window
     for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
     {
@@ -35,13 +32,12 @@ int Application::run()
 				const auto rcpViewMatrix = m_CameraController.getRcpViewMatrix();
 
 				m_SceneSizeLength = 10.f;
-				m_SceneCenter = glm::vec3(1.f, 1.f, 1.f);
+				m_SceneCenter = glm::vec3(0.f, 0.f, 0.f);
 
 				const float sceneRadius = m_SceneSizeLength * 10.f;
 
 				const auto dirLightUpVector = computeDirectionVectorUp(glm::radians(m_DirLightPhiAngleDegrees), glm::radians(m_DirLightThetaAngleDegrees));
 				const auto dirLightViewMatrix = glm::lookAt(m_SceneCenter + m_DirLightDirection * sceneRadius, m_SceneCenter, dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
-        // const auto dirLightViewMatrix = glm::lookAt(glm::vec3(0.f) + m_DirLightDirection * 100.f, glm::vec3(0.f), dirLightUpVector); // Will not work if m_DirLightDirection is colinear to lightUpVector
 				const auto dirLightProjMatrix = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.01f * sceneRadius, 2.f * sceneRadius);
 
 				// Shadow Map
@@ -367,8 +363,6 @@ int Application::run()
          if (!guiHasFocus) {
              m_CameraController.update(float(ellapsedTime));
          }
-
-				 // exit(0);
      }
 
  	 	return 0;
@@ -506,10 +500,11 @@ Application::Application(int argc, char** argv):
 		std::cout << "# of vaos : " << m_VAOs.size() << std::endl;
 
 		computeMatrices(m_Model.nodes[0], glm::mat4(1));
-		computeScaling();
+		computeBBOX();
+		computeScaling3();
 		std::cout << "# of matrices : " << m_ModelMatrices.size() << std::endl;
 
-		m_CameraController.setHauteur(10 / 2);
+		m_CameraController.setHauteur(0);
 
 
 		// Samplers -----------------------
@@ -768,61 +763,6 @@ void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
 			const auto translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
 			modelMatrix = glm::translate(modelMatrix, translation);
 		}
-
-		// Resizing
-		bool firstLoop = true;
-		float min = 0.f;
-		float max = 0.f;
-		if (node.mesh > -1) {
-
-			tinygltf::Mesh mesh = m_Model.meshes[node.mesh];
-			for (auto primitive : mesh.primitives) {
-				tinygltf::Accessor accessor = m_Model.accessors[primitive.indices];
-
-				if (accessor.minValues.size() > 0 && accessor.maxValues.size() > 0) {
-						float primitiveMin = accessor.minValues[0];
-						float primitiveMax = accessor.maxValues[0];
-						if (firstLoop) {
-								min = primitiveMin;
-								max = primitiveMax;
-								firstLoop = false;
-						} else {
-								if (primitiveMin < min) {
-									min = primitiveMin;
-								}
-								if (primitiveMax > max) {
-									max = primitiveMax;
-								}
-						}
-				}
-			}
-			glm::vec3 meshCenter = 0.5f * (glm::vec3(max) + glm::vec3(min));
-			glm::vec3 meshSize = glm::vec3(max) - glm::vec3(min);
-			float meshLength = glm::length(meshSize);
-			std::cout << "Mesh center = " << meshCenter << std::endl;
-
-			float maxAxis = meshSize[0];
-			if (meshSize[1] > maxAxis) { maxAxis = meshSize[1]; }
-			if (meshSize[2] > maxAxis) { maxAxis = meshSize[2]; }
-
-			// modelMatrix = glm::scale(modelMatrix, glm::vec3(1 / maxAxis));
-			// modelMatrix = glm::translate(modelMatrix, glm::vec3(0.f, -meshSize[1] * 0.5, 0.f));
-
-			if (m_SceneCenter != glm::vec3(0.f)) {
-				m_SceneCenter = 0.5f * (m_SceneCenter + meshCenter);
-			}
-			else {
-				m_SceneCenter = meshCenter;
-			}
-
-			m_SceneSize += meshSize;
-			m_SceneSizeLength += meshLength;
-
-
-
-		}
-
-
 	}
 
 	// Application des transformation sur la matrice parente héritée
@@ -838,4 +778,57 @@ void Application::computeMatrices(tinygltf::Node node, glm::mat4 matrix) {
 		computeMatrices(m_Model.nodes[child], modelMatrix);
 	}
 
+}
+
+void Application::computeBBOX() {
+
+		for (uint i = 0; i < m_Primitives.size(); ++i) {
+				auto primitive = m_Primitives[i];
+
+				tinygltf::Accessor accessor = m_Model.accessors[primitive.indices];
+
+					if (accessor.minValues.size() > 0 && accessor.maxValues.size() > 0) {
+						// for (uint i = 0; i < 3; ++i) {
+						// 	float primitiveMin = accessor.minValues[i];
+						// 	float primitiveMax = accessor.maxValues[i];
+						// 	if (primitiveMin < m_ModelBBOXMin[i]) {
+						// 			m_ModelBBOXMin[i] = primitiveMin;
+						// 	}
+						// 	if (primitiveMax > m_ModelBBOXMax[i]) {
+						// 			m_ModelBBOXMax[i] = primitiveMax;
+						// 	}
+						// }
+
+						float primitiveMin = accessor.minValues[0];
+						float primitiveMax = accessor.maxValues[0];
+						if (primitiveMin < m_ModelBBOXMin[0]) {
+								m_ModelBBOXMin[0] = primitiveMin;
+								m_ModelBBOXMin[1] = 0;
+								m_ModelBBOXMin[2] = 0;
+						}
+						if (primitiveMax > m_ModelBBOXMax[0]) {
+								m_ModelBBOXMax[0] = primitiveMax;
+								m_ModelBBOXMax[1] = 0;
+								m_ModelBBOXMax[2] = 0;
+						}
+					}
+		}
+
+		for (uint i = 0; i < 3; ++i) {
+			if (m_ModelBBOXMax[i] == std::numeric_limits<float>::infinity() || m_ModelBBOXMax[i] == -std::numeric_limits<float>::infinity()) {
+					m_ModelBBOXMax[i] = 0;
+			}
+			if (m_ModelBBOXMin[i] == std::numeric_limits<float>::infinity() || m_ModelBBOXMin[i] == -std::numeric_limits<float>::infinity()) {
+					m_ModelBBOXMin[i] = 0;
+			}
+		}
+
+
+		m_ModelBBOX = glm::vec3(glm::round(m_ModelBBOXMax[0] - m_ModelBBOXMin[0]), glm::round(m_ModelBBOXMax[1] - m_ModelBBOXMin[1]), glm::round(m_ModelBBOXMax[2] - m_ModelBBOXMin[2]));
+		m_ModelCenter = glm::vec3(glm::round((m_ModelBBOXMax[0] + m_ModelBBOXMin[0]) / 2), glm::round((m_ModelBBOXMax[1] + m_ModelBBOXMin[1]) / 2), glm::round((m_ModelBBOXMax[2] + m_ModelBBOXMin[2]) / 2));
+		m_ModelLength = glm::length(m_ModelBBOX);
+		std::cout << "BBOX = " << m_ModelBBOX << std::endl;
+		std::cout << "BBOX Max = " << m_ModelBBOXMax << std::endl;
+		std::cout << "BBOX Min = " << m_ModelBBOXMin << std::endl;
+		std::cout << "Center = " << m_ModelCenter << std::endl;
 }

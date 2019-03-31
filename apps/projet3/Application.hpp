@@ -28,6 +28,7 @@ private:
     void computeMatrices(tinygltf::Node node, glm::mat4 matrix);
     void initShadersData();
     void initShadowData();
+    void computeBBOX();
 
     glm::mat4 scaleModel(glm::mat4 matrix) {
       return glm::translate(glm::scale(matrix, m_ModelScaling), m_ModelTranslating);
@@ -40,10 +41,6 @@ private:
 
       for (uint i = 0; i < m_ModelMatrices.size(); ++i) {
         glm::mat4 matrix = m_ModelMatrices[i];
-
-        // std::cout << matrix << std::endl;
-        // std::cout << "scale : (" << matrix[0][0] << ", " << matrix[1][1] << ", " << matrix[2][2] << ")" << std::endl;
-        // std::cout << "translate : (" << matrix[3][0] << ", " << matrix[3][1] << ", " << matrix[3][2] << ")" << std::endl;
 
         // Scaling
         if (glm::abs(matrix[0][0]) > maxScale) {
@@ -68,16 +65,14 @@ private:
         }
       }
 
-      // std::cout << "max scale : " << maxScale << std::endl;
-      // std::cout << "max translation : " << maxTranslation * 0.1 << std::endl;
-
       if (maxTranslation > maxScale) {
-        scaleFactor = 1.f / (maxTranslation * 0.1);
+        scaleFactor = 1.f / (maxTranslation);
       } else {
         scaleFactor = 1.f / maxScale;
       }
 
       m_ModelScaling = glm::vec3(scaleFactor, scaleFactor, scaleFactor);
+
     }
 
     void computeScaling2() {
@@ -92,6 +87,17 @@ private:
        std::cout << "scaling = " << m_ModelScaling << std::endl;
  			 m_ModelTranslating = glm::vec3(0.f, m_SceneSize[1] * (3000 / maxAxis) * 0.005, 0.f);
     }
+
+    void computeScaling3() {
+       float maxAxis = m_ModelBBOX[0];
+       if (m_ModelBBOX[1] > maxAxis) { maxAxis = m_ModelBBOX[1]; }
+       if (m_ModelBBOX[2] > maxAxis) { maxAxis = m_ModelBBOX[2]; }
+
+       m_ModelScaling = glm::vec3(100.f / maxAxis);
+       // m_ModelTranslating = glm::vec3(0.f - m_ModelLength * 0.01, -m_ModelLength * 0.005, 0.f - m_ModelLength * 0.01);
+ 			 m_ModelTranslating = glm::vec3(0.f, -m_ModelLength * 0.005, 0.f);
+    }
+
 
     static glm::mat4 quatToMatrix(glm::vec4 q) {
       float sqw = q.w * q.w;
@@ -257,6 +263,13 @@ private:
     std::vector<GLuint> m_VAOs;
     std::vector<tinygltf::Primitive> m_Primitives;
 
+    glm::vec3 m_ModelBBOXMin = glm::vec3(std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity());
+    glm::vec3 m_ModelBBOXMax = -glm::vec3(std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity());
+    glm::vec3 m_ModelBBOX;
+    glm::vec3 m_ModelCenter;
+    glm::vec3 m_ModelSize;
+    float m_ModelLength;
+
     glm::vec3 m_ModelScaling = glm::vec3(1,1,1);
     glm::vec3 m_ModelTranslating = glm::vec3(0,0,0);
 
@@ -277,7 +290,6 @@ private:
 
     glmlv::GLProgram m_program;
 
-    // glmlv::ViewController m_viewController{ m_GLFWHandle.window(), 3.f };
     CameraController m_CameraController{ m_GLFWHandle.window(), 0.008f };
 
     // GLSL programs
