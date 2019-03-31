@@ -19,6 +19,8 @@ int Application::run()
 	bool directionalSMDirty = true;
 	bool directionalSMResolutionDirty = false;
 
+	float gamma = 2.2;
+
 	std::cout << "scene radius = " << m_SceneSizeLength * 0.5f << std::endl;
 	std::cout << "scene center = " << m_SceneCenter * 0.5f << std::endl;
 
@@ -177,47 +179,59 @@ int Application::run()
 						glBindVertexArray(0);
 						glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-					}
+				}
 
-					// Shading pass
-					{
-							m_shadingPassProgram.use();
+				// Shading pass
+				{
+						m_shadingPassProgram.use();
 
-							glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_BeautyFBO);
+						glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_BeautyFBO);
 
-							glViewport(0, 0, viewportSize.x, viewportSize.y);
-							glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+						glActiveTexture(GL_TEXTURE0 + GDepth);
+						glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
+						glBindSampler(GDepth, m_directionalSMSampler);
+						glUniform1i(m_uDirLightShadowMap, GDepth);
 
-							glUniform3fv(m_uDirectionalLightDirLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(m_DirLightDirection), 0))));
-							glUniform3fv(m_uDirectionalLightIntensityLocation, 1, glm::value_ptr(m_DirLightColor * m_DirLightIntensity));
+						glViewport(0, 0, viewportSize.x, viewportSize.y);
+						glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-							glUniform3fv(m_uPointLightPositionLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(m_PointLightPosition, 1))));
-							glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
+						glUniform3fv(m_uDirectionalLightDirLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(glm::normalize(m_DirLightDirection), 0))));
+						glUniform3fv(m_uDirectionalLightIntensityLocation, 1, glm::value_ptr(m_DirLightColor * m_DirLightIntensity));
 
-							glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
-							glUniform1iv(m_uDirLightShadowMapSampleCount, 1, &m_DirLightSMSampleCount);
-							glUniform1fv(m_uDirLightShadowMapSpread, 1, &m_DirLightSMSpread);
+						glUniform3fv(m_uPointLightPositionLocation, 1, glm::value_ptr(glm::vec3(viewMatrix * glm::vec4(m_PointLightPosition, 1))));
+						glUniform3fv(m_uPointLightIntensityLocation, 1, glm::value_ptr(m_PointLightColor * m_PointLightIntensity));
 
-							glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
+						glUniform1fv(m_uDirLightShadowMapBias, 1, &m_DirLightSMBias);
+						glUniform1iv(m_uDirLightShadowMapSampleCount, 1, &m_DirLightSMSampleCount);
+						glUniform1fv(m_uDirLightShadowMapSpread, 1, &m_DirLightSMSpread);
 
-							for (int32_t i = GPosition; i < GDepth; ++i) {
-									glActiveTexture(GL_TEXTURE0 + i);
-									glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
+						glUniformMatrix4fv(m_uDirLightViewProjMatrix_shadingPass, 1, GL_FALSE, glm::value_ptr(dirLightProjMatrix * dirLightViewMatrix * rcpViewMatrix));
 
-									glUniform1i(m_uGBufferSamplerLocations[i], i);
-							}
+						for (int32_t i = GPosition; i < GDepth; ++i) {
+								glActiveTexture(GL_TEXTURE0 + i);
+								glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
 
-							glActiveTexture(GL_TEXTURE0 + GDepth);
-							glBindTexture(GL_TEXTURE_2D, m_directionalSMTexture);
-							glBindSampler(GDepth, m_directionalSMSampler);
-							glUniform1i(m_uDirLightShadowMap, GDepth);
+								glUniform1i(m_uGBufferSamplerLocations[i], i);
+						}
 
-							glBindVertexArray(m_TriangleVAO);
-							glDrawArrays(GL_TRIANGLES, 0, 3);
-							glBindVertexArray(0);
+						glBindVertexArray(m_TriangleVAO);
+						glDrawArrays(GL_TRIANGLES, 0, 3);
+						glBindVertexArray(0);
 
-							glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-					}
+						glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+				}
+
+				// Gamma correction pass
+	      {
+           	m_gammaCorrectionProgram.use();
+
+						float exponent = 1.f / gamma;
+            glUniform1f(m_uGammaExponent, exponent);
+            glBindImageTexture(0, m_BeautyTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            glBindImageTexture(1, m_GammaCorrectedBeautyTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+            glDispatchCompute(m_nWindowWidth, m_nWindowHeight, 1);
+				}
 
 				// Put here rendering code
         glViewport(0, 0, viewportSize.x, viewportSize.y);
@@ -225,7 +239,7 @@ int Application::run()
 
         if (m_CurrentlyDisplayed == GBufferTextureCount) { // Beauty
 
-					glBindFramebuffer(GL_READ_FRAMEBUFFER, m_BeautyFBO);
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, m_GammaCorrectedBeautyFBO);
 					glReadBuffer(GL_COLOR_ATTACHMENT0);
 					glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
@@ -296,6 +310,7 @@ int Application::run()
              if (ImGui::ColorEdit3("clearColor", clearColor)) {
                  glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
              }
+						 ImGui::DragFloat("gamma", &gamma, 0.1f, 0.0f, 100.f);
              if (ImGui::CollapsingHeader("Directional Light"))
              {
                  ImGui::ColorEdit3("DirLightColor", glm::value_ptr(m_DirLightColor));
@@ -597,6 +612,32 @@ Application::Application(int argc, char** argv):
 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
+		// Init GAMMA beauty texture and FBO
+    glGenTextures(1, &m_GammaCorrectedBeautyTexture);
+
+    glBindTexture(GL_TEXTURE_2D, m_GammaCorrectedBeautyTexture);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, m_nWindowWidth, m_nWindowHeight);
+
+    glGenFramebuffers(1, &m_GammaCorrectedBeautyFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_GammaCorrectedBeautyFBO);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_GammaCorrectedBeautyTexture, 0);
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    {
+        GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "FB error, status: " << status << std::endl;
+            throw std::runtime_error("FBO error");
+        }
+    }
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+
+
+		// TRIANGLE
 		glGenBuffers(1, &m_TriangleVBO);
     glBindBuffer(GL_ARRAY_BUFFER, m_TriangleVBO);
 
@@ -660,6 +701,9 @@ void Application::initShadersData() {
 
 		m_directionalSMProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "directionalSM.vs.glsl", m_ShadersRootPath / m_AppName / "directionalSM.fs.glsl" });
 		m_uDirLightViewProjMatrix = glGetUniformLocation(m_directionalSMProgram.glId(), "uDirLightViewProjMatrix");
+
+		m_gammaCorrectionProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "gammaCorrect.cs.glsl" });
+		m_uGammaExponent = glGetUniformLocation(m_gammaCorrectionProgram.glId(), "uGammaExponent");
 }
 
 void Application::initShadowData() {

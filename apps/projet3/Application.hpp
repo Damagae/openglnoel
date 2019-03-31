@@ -187,6 +187,9 @@ private:
     GLuint m_BeautyTexture;
     GLuint m_BeautyFBO;
 
+    GLuint m_GammaCorrectedBeautyTexture;
+    GLuint m_GammaCorrectedBeautyFBO;
+
     GBufferTextureType m_CurrentlyDisplayed = GBufferTextureCount; // Default to beauty
 
     // Triangle covering the whole screen, for the shading pass:
@@ -283,6 +286,7 @@ private:
     glmlv::GLProgram m_displayDepthProgram;
     glmlv::GLProgram m_displayPositionProgram;
     glmlv::GLProgram m_directionalSMProgram;
+    glmlv::GLProgram m_gammaCorrectionProgram;
 
     // Geometry pass uniforms
     GLint m_uModelViewProjMatrixLocation;
@@ -318,6 +322,9 @@ private:
 
     // Shadow Mapping uniform
     GLint m_uDirLightViewProjMatrix;
+
+    // Gamma correct uniform
+    GLint m_uGammaExponent = 2.2f;
 
     // Lights
     float m_DirLightPhiAngleDegrees = 16.f;
